@@ -1,28 +1,34 @@
 package controllers
 
 import (
-	"github.com/endaaman/api.endaaman.me/models"
 	// "encoding/json"
 	"github.com/astaxie/beego"
+
+	// "github.com/endaaman/api.endaaman.me/models"
+	"github.com/endaaman/api.endaaman.me/usecases"
 )
 
 type ArticleController struct {
 	beego.Controller
+	usecase usecases.ArticleUsecase
+}
+
+func NewArticleController(usecase usecases.ArticleUsecase) *ArticleController {
+	c := ArticleController{usecase: usecase}
+	return &c
 }
 
 func (c *ArticleController) Prepare() {
-	print("pre")
 }
 
-// @Title GetAllArticles
-// @Description get all objects
+// @Title GetArticles
+// @Description get all articles
 // @Success 200 {object} models.Object
 // @Failure 403 :objectId is empty
 // @router / [get]
 func (c *ArticleController) Get() {
-	c.Data["json"] = models.GetAllArticles()
+	c.Data["json"] = c.usecase.View
 	c.ServeJSON()
-
 }
 
 // @Title CreateArticle

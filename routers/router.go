@@ -9,11 +9,15 @@ package routers
 
 import (
 	"github.com/endaaman/api.endaaman.me/controllers"
-
 	"github.com/astaxie/beego"
 )
 
-func init() {
+type Router struct {
+}
+
+func RegisterRouter(
+	articleController *controllers.ArticleController,
+) *Router {
 	ns := beego.NewNamespace("/v1",
 		// beego.NSNamespace("/object",
 		// 	beego.NSInclude(
@@ -27,9 +31,12 @@ func init() {
 		// ),
 		beego.NSNamespace("/articles",
 			beego.NSInclude(
-				&controllers.ArticleController{},
+				articleController,
 			),
 		),
 	)
 	beego.AddNamespace(ns)
+
+	router := Router{}
+	return &router
 }

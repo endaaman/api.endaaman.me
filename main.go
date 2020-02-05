@@ -1,23 +1,15 @@
 package main
 
 import (
-	// "fmt"
+	// "regexp"
 	_ "github.com/endaaman/api.endaaman.me/routers"
-
+	// "github.com/endaaman/api.endaaman.me/infras"
     "github.com/astaxie/beego"
-    "github.com/astaxie/beego/orm"
-    _ "github.com/go-sql-driver/mysql"
 )
 
 func main() {
-    orm.RegisterDriver("mysql", orm.DRMySQL)
-    orm.RegisterDataBase("default", "mysql", beego.AppConfig.String("sqlconn"))
-
-    // err := orm.RunSyncdb("default", false, true)
-    // if err != nil {
-    //     fmt.Println(err)
-    // }
-	orm.RunCommand()
+	// go infras.StartWatching()
+	_ = Inject()
 
     if beego.BConfig.RunMode == "dev" {
         beego.BConfig.WebConfig.DirectoryIndex = true
@@ -25,4 +17,3 @@ func main() {
     }
     beego.Run()
 }
-

@@ -4,17 +4,24 @@ import (
 	// "errors"
 	// "strconv"
 	// "time"
-    "github.com/astaxie/beego/orm"
 )
 
+var articles = []*Article{}
+
 type Article struct {
-    Id	int	`orm:"pk;unique;auto;column(article_id)"`
 }
 
 func init() {
-    orm.RegisterModel(new(Article))
 }
 
-func GetAllArticles() []*Article {
-	return []*Article{}
+func (_ *Article) TableName() string {
+    return "articles"
+}
+
+func GetArticles() []*Article {
+	return articles
+}
+
+func SetArticles() []*Article {
+	return articles
 }
