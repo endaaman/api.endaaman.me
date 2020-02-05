@@ -4,19 +4,8 @@ import (
 	// "encoding/json"
 	"github.com/astaxie/beego"
 
-	// "github.com/endaaman/api.endaaman.me/models"
-	"github.com/endaaman/api.endaaman.me/usecases"
+	"github.com/endaaman/api.endaaman.me/services"
 )
-
-type ArticleController struct {
-	beego.Controller
-	usecase usecases.ArticleUsecase
-}
-
-func NewArticleController(usecase usecases.ArticleUsecase) *ArticleController {
-	c := ArticleController{usecase: usecase}
-	return &c
-}
 
 func (c *ArticleController) Prepare() {
 }

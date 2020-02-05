@@ -8,9 +8,7 @@ import (
 )
 
 func main() {
-	// go infras.StartWatching()
-	_ = Inject()
-
+	go infras.StartWatching()
     if beego.BConfig.RunMode == "dev" {
         beego.BConfig.WebConfig.DirectoryIndex = true
         beego.BConfig.WebConfig.StaticDir["/swagger"] = "swagger"
