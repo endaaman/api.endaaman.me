@@ -4,8 +4,14 @@ import (
 	// "encoding/json"
 	"github.com/astaxie/beego"
 
+	"github.com/endaaman/api.endaaman.me/models"
 	"github.com/endaaman/api.endaaman.me/services"
 )
+
+type ArticleController struct {
+	beego.Controller
+	admin bool
+}
 
 func (c *ArticleController) Prepare() {
 }
@@ -16,7 +22,9 @@ func (c *ArticleController) Prepare() {
 // @Failure 403 :objectId is empty
 // @router / [get]
 func (c *ArticleController) Get() {
-	c.Data["json"] = c.usecase.View
+    aaCh := make(chan []*models.Article)
+	go services.RetrieveArticles(aaCh)
+	c.Data["json"] = <-aaCh
 	c.ServeJSON()
 }
 

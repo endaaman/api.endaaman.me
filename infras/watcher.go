@@ -1,21 +1,26 @@
 package infras
 
 import (
-	"fmt"
 	"log"
 	"time"
+	"sync"
 	"github.com/radovskyb/watcher"
 	"github.com/bep/debounce"
+    "github.com/astaxie/beego"
 )
 
+var watcher_mutex sync.Mutex
 
 func notify() {
-	fmt.Println("DEBOUCED")
+	watcher_mutex.Lock()
+	ch := make(chan struct{})
+	go ReadAllArticles(ch)
+	<-ch
+	watcher_mutex.Unlock()
 }
 
 func StartWatching() {
 	w := watcher.New()
-
 	// w.SetMaxEvents(1)
 	w.FilterOps(watcher.Create, watcher.Rename, watcher.Move, watcher.Write)
 	// r := regexp.MustCompile("^abc$")
@@ -25,8 +30,9 @@ func StartWatching() {
 		debounced := debounce.New(time.Second)
 		for {
 			select {
-			case event := <-w.Event:
-				fmt.Println(event) // Print the event's info.
+			// case event := <-w.Event:
+			// 	fmt.Println(event)
+			case <-w.Event:
 				debounced(notify)
 			case err := <-w.Error:
 				log.Fatalln(err)
@@ -37,7 +43,8 @@ func StartWatching() {
 	}()
 
 	// Watch this folder for changes.
-	if err := w.AddRecursive("./shared/articles"); err != nil {
+	dir := beego.AppConfig.String("articles_dir")
+	if err := w.AddRecursive(dir); err != nil {
 		log.Fatalln(err)
 	}
 

@@ -3,25 +3,31 @@ package models
 import (
 	// "errors"
 	// "strconv"
-	// "time"
 )
 
-var articles = []*Article{}
-
 type Article struct {
+	category Category
+	title string
+	aliases []string
+	tags []string
+	image string
+	digest string
+	priority int
+	private bool
+	special bool
+	date string // 2020-01-01
 }
 
 func init() {
 }
 
-func (_ *Article) TableName() string {
-    return "articles"
+// func (_ *Article) TableName() string {
+//     return "articles"
+// }
+
+func (a *Article) FromText(text string, slug string) {
 }
 
-func GetArticles() []*Article {
-	return articles
-}
-
-func SetArticles() []*Article {
-	return articles
+func (a *Article) ToText() string {
+	return ""
 }

@@ -12,12 +12,7 @@ import (
 	"github.com/astaxie/beego"
 )
 
-type Router struct {
-}
-
-func RegisterRouter(
-	articleController *controllers.ArticleController,
-) *Router {
+func init () {
 	ns := beego.NewNamespace("/v1",
 		// beego.NSNamespace("/object",
 		// 	beego.NSInclude(
@@ -31,12 +26,9 @@ func RegisterRouter(
 		// ),
 		beego.NSNamespace("/articles",
 			beego.NSInclude(
-				articleController,
+				&controllers.ArticleController{},
 			),
 		),
 	)
 	beego.AddNamespace(ns)
-
-	router := Router{}
-	return &router
 }
