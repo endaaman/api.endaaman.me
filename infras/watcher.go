@@ -12,11 +12,7 @@ import (
 var watcher_mutex sync.Mutex
 
 func notify() {
-	watcher_mutex.Lock()
-	ch := make(chan struct{})
-	go ReadAllArticles(ch)
-	<-ch
-	watcher_mutex.Unlock()
+	ReadAllArticles()
 }
 
 func StartWatching() {

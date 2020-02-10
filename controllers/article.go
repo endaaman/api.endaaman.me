@@ -1,7 +1,9 @@
 package controllers
 
 import (
-	// "encoding/json"
+	"fmt"
+	// "net/url"
+	"encoding/json"
 	"github.com/astaxie/beego"
 
 	"github.com/endaaman/api.endaaman.me/models"
@@ -16,28 +18,49 @@ type ArticleController struct {
 func (c *ArticleController) Prepare() {
 }
 
-// @Title GetArticles
-// @Description get all articles
-// @Success 200 {object} models.Object
-// @Failure 403 :objectId is empty
+// @Title Get all articles
+// @Success 200 {object} models.Article
 // @router / [get]
 func (c *ArticleController) Get() {
-    aaCh := make(chan []*models.Article)
-	go services.RetrieveArticles(aaCh)
-	c.Data["json"] = <-aaCh
+    ch := make(chan []*models.Article)
+	go services.RetrieveArticles(ch)
+	aa := <-ch
+	fmt.Println(aa)
+	c.Data["json"] = aa
 	c.ServeJSON()
 }
 
-// @Title CreateArticle
-// @Description create object
-// @Param	article	body 	models.Object	true		"The article content"
-// @Success 201 {body} models.Object.Id
-// @Failure 403 body is empty
+// @Title Create an article
+// @Param	article	body 	models.Article	true	"The article content"
+// @Success 201 Success
+// @Failure 400 Validation error
 // @router / [post]
 func (c *ArticleController) Post() {
-	// var a models.Article
-	// json.Unmarshal(o.Ctx.Input.RequestBody, &a)
-	// objectid := models.AddOne(ob)
-	// o.Data["json"] = map[string]string{"ObjectId": objectid}
+	var a models.Article
+	err := json.Unmarshal(c.Ctx.Input.RequestBody, &a)
+	if err != nil {
+		c.Data["json"] = map[string]string{"message": err.Error()}
+		c.Ctx.ResponseWriter.WriteHeader(400)
+		c.ServeJSON()
+		return
+	}
+
+	messages := a.Validate()
+	if messages != nil {
+		c.Data["json"] = map[string]interface{}{"errors": messages, "message": "There are some value errors."}
+		// s, _ := json.MarshalIndent(a, "", "  ")
+		// fmt.Println(string(s))
+		c.Ctx.ResponseWriter.WriteHeader(400)
+		c.ServeJSON()
+		return
+	}
+
+	ch := make(chan error)
+	go services.AppendArticle(&a, ch)
+	err = <-ch
+	if err != nil {
+		c.Data["json"] = err
+		c.Ctx.ResponseWriter.WriteHeader(400)
+	}
 	c.ServeJSON()
 }

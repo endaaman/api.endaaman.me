@@ -2,30 +2,49 @@ package infras
 
 import (
 	"sync"
-
 	"github.com/endaaman/api.endaaman.me/models"
 )
 
-var cache_mutex sync.RWMutex
+var aa_mutex sync.RWMutex
+var ww_mutex sync.RWMutex
 var loading = true
 var articles []*models.Article
+var warnings []string
 
 func GetCachedArticles() []*models.Article {
-	cache_mutex.RLock()
+	aa_mutex.RLock()
 	var aa = articles
-	cache_mutex.RUnlock()
+	aa_mutex.RUnlock()
 	return aa
 }
 
 func SetCachedArticles(aa []*models.Article) {
-	cache_mutex.Lock()
+	aa_mutex.Lock()
 	articles = aa
-	cache_mutex.Unlock()
+	aa_mutex.Unlock()
 }
 
-func IsLoading() bool {
-	cache_mutex.RLock()
-	var i = loading
-	cache_mutex.RUnlock()
-	return i
+// func AddCachedArticle(a *models.Article) {
+// 	aa := GetCachedArticles()
+// 	aa = append(aa, a)
+// 	SetCachedArticles(aa)
+// }
+
+func GetCachedWarnings() []string {
+	ww_mutex.RLock()
+	var ww = warnings
+	ww_mutex.RUnlock()
+	return ww
 }
+
+func SetCachedWarnings(ww []string) {
+	ww_mutex.Lock()
+	warnings = ww
+	ww_mutex.Unlock()
+}
+
+// func AddCachedWarning(w string) {
+// 	ww := GetCachedWarnings()
+// 	ww = append(ww, w)
+// 	SetCachedWarnings(ww)
+// }
