@@ -7,12 +7,23 @@ import (
 	"github.com/radovskyb/watcher"
 	"github.com/bep/debounce"
     "github.com/astaxie/beego"
+    "github.com/astaxie/beego/logs"
 )
 
 var watcher_mutex sync.Mutex
+var ch = make(chan bool)
 
 func notify() {
-	ReadAllArticles()
+	logs.Info("Detect changes")
+	ReadAllArticles().Wait()
+	ch <- true
+}
+
+func AwaitNextChange() {
+    select {
+    case <-ch:
+    case <-time.After(3 * time.Second):
+    }
 }
 
 func StartWatching() {
@@ -23,15 +34,13 @@ func StartWatching() {
 	// w.AddFilterHook(watcher.RegexFilterHook(r, false))
 
 	go func() {
-		debounced := debounce.New(time.Second)
+		debounced := debounce.New(time.Millisecond * 100)
 		for {
 			select {
-			// case event := <-w.Event:
-			// 	fmt.Println(event)
 			case <-w.Event:
 				debounced(notify)
 			case err := <-w.Error:
-				log.Fatalln(err)
+				logs.Error(err)
 			case <-w.Closed:
 				return
 			}
@@ -48,7 +57,7 @@ func StartWatching() {
 	// 	fmt.Printf("%s: %s\n", path, f.Name())
 	// }
 
-	if err := w.Start(time.Millisecond * 100); err != nil {
+	if err := w.Start(time.Millisecond * 300); err != nil {
 		log.Fatalln(err)
 	}
 }

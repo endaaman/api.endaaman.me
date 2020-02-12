@@ -18,20 +18,21 @@ import (
 const HEADER_DELIMITTER = "---"
 
 type Header struct {
-	Title string      `json:"title"`
-	Tags []string     `json:"tags"`
-	Aliases []string  `json:"aliases"`
-	Digest string     `json:"digest"`
-	Image string      `json:"image"`
-	Private bool      `json:"private"`
-	Special bool      `json:"special"`
-	Priority int      `json:"priority"`
-	Date string       `json:"date"`
+	Title string      `json:"title" yaml:",omitempty"`
+	Tags []string     `json:"tags" yaml:",omitempty"`
+	Aliases []string  `json:"aliases" yaml:",omitempty"`
+	Digest string     `json:"digest" yaml:",omitempty"`
+	Image string      `json:"image" yaml:",omitempty"`
+	Private bool      `json:"private" yaml:",omitempty"`
+	Special bool      `json:"special" yaml:",omitempty"`
+	Priority int      `json:"priority" yaml:",omitempty"`
+	Date string       `json:"date" yaml:",omitempty"`
 }
 
 
 type Article struct {
 	Header
+	Slug string     `json:"slug"`
 	Category string `json:"category"`
 	Body string     `json:"body"`
 	Warning string  `json:"warning"`
@@ -52,17 +53,20 @@ func init() {
 	})
 }
 
-func (a *Article) FromText(text string, slug string, date string) {
+func NewArticle() *Article {
+	a := Article{}
+	a.Tags = make([]string, 0)
+	a.Aliases = make([]string, 0)
+	a.Date = time.Now().Format("2006-01-02")
+	return &a
+}
+
+func (a *Article) FromText(text string, category string, slug string, date string) {
 	fmt.Printf("FROM: slug: %s %s\n", slug, date)
 
-	splitted_slug := strings.SplitN(slug, "/", 2)
-	if len(splitted_slug) == 2 {
-		a.Title = splitted_slug[0]
-		a.Category = splitted_slug[1]
-	} else {
-		a.Title = slug
-		a.Category = ""
-	}
+	a.Title = slug
+	a.Slug = slug
+	a.Category = category
 	a.Date = date
 
 	// var header []string
@@ -91,8 +95,8 @@ func (a *Article) FromText(text string, slug string, date string) {
 
 func (a *Article) Validate() url.Values {
 	rules := govalidator.MapData{
-		"title": []string{"required"},
-		"date": []string{"strict_date_str"},
+		"slug": []string{"required"},
+		"date": []string{"required", "strict_date_str"},
 	}
 
 	opts := govalidator.Options{
@@ -110,5 +114,16 @@ func (a *Article) Validate() url.Values {
 }
 
 func (a *Article) ToText() string {
-	return ""
+	buf, err := yaml.Marshal(&a.Header)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	headerText := string(buf)
+
+	content := a.Body
+	if headerText != "{}\n" {
+		template := "---\n%s---\n%s"
+		content = fmt.Sprintf(template, headerText, a.Body)
+	}
+	return content
 }

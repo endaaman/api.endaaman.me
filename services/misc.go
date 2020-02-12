@@ -5,6 +5,6 @@ import (
 )
 
 func RetrieveWarnings(ch chan<- []string) {
-	infras.WaitReader()
+	infras.WaitIO()
     ch <- infras.GetCachedWarnings()
 }

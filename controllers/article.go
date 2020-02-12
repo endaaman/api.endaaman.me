@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"fmt"
 	// "net/url"
 	"encoding/json"
 	"github.com/astaxie/beego"
@@ -18,15 +17,24 @@ type ArticleController struct {
 func (c *ArticleController) Prepare() {
 }
 
+func (c *ArticleController) ServeJSONText(data []byte) {
+	c.Ctx.Output.Header("Content-Description", "File Transfer")
+	c.Ctx.Output.Header("Content-Type", "application/octet-stream")
+	// c.Ctx.Output.Header("Content-Disposition", "attachment; filename="+filename)
+	c.Ctx.Output.Header("Content-Transfer-Encoding", "binary")
+	c.Ctx.Output.Header("Expires", "0")
+	c.Ctx.Output.Header("Cache-Control", "must-revalidate")
+	c.Ctx.Output.Header("Pragma", "public")
+	c.Ctx.Output.Body(data)
+}
+
 // @Title Get all articles
 // @Success 200 {object} models.Article
 // @router / [get]
 func (c *ArticleController) Get() {
     ch := make(chan []*models.Article)
 	go services.RetrieveArticles(ch)
-	aa := <-ch
-	fmt.Println(aa)
-	c.Data["json"] = aa
+	c.Data["json"] = <-ch
 	c.ServeJSON()
 }
 
@@ -36,8 +44,8 @@ func (c *ArticleController) Get() {
 // @Failure 400 Validation error
 // @router / [post]
 func (c *ArticleController) Post() {
-	var a models.Article
-	err := json.Unmarshal(c.Ctx.Input.RequestBody, &a)
+	a := models.NewArticle()
+	err := json.Unmarshal(c.Ctx.Input.RequestBody, a)
 	if err != nil {
 		c.Data["json"] = map[string]string{"message": err.Error()}
 		c.Ctx.ResponseWriter.WriteHeader(400)
@@ -56,11 +64,16 @@ func (c *ArticleController) Post() {
 	}
 
 	ch := make(chan error)
-	go services.AppendArticle(&a, ch)
+	go services.AppendArticle(a, ch)
 	err = <-ch
 	if err != nil {
 		c.Data["json"] = err
 		c.Ctx.ResponseWriter.WriteHeader(400)
+		c.ServeJSON()
+		return
 	}
+    ch2 := make(chan []*models.Article)
+	go services.RetrieveArticles(ch2)
+	c.Data["json"] = <-ch2
 	c.ServeJSON()
 }
