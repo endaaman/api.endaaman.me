@@ -29,7 +29,16 @@ func init() {
         beego.ControllerComments{
             Method: "Update",
             Router: `/:category/:slug`,
-            AllowHTTPMethods: []string{"patch"},
+            AllowHTTPMethods: []string{"put"},
+            MethodParams: param.Make(),
+            Filters: nil,
+            Params: nil})
+
+    beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:ArticleController"] = append(beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:ArticleController"],
+        beego.ControllerComments{
+            Method: "Remove",
+            Router: `/:category/:slug`,
+            AllowHTTPMethods: []string{"delete"},
             MethodParams: param.Make(),
             Filters: nil,
             Params: nil})

@@ -13,7 +13,8 @@ import (
 	"github.com/endaaman/api.endaaman.me/models"
 )
 
-var ioWaiter = &sync.WaitGroup{}
+var ioWaiter = new(sync.WaitGroup)
+var ioMutex = new(sync.Mutex)
 var regMd = regexp.MustCompile(`\.md$`)
 
 
@@ -46,6 +47,8 @@ func dirwalk(dir string) []string {
 }
 
 func innerReadAllArticles() {
+	ioMutex.Lock()
+	defer ioMutex.Unlock()
 	ww := make([]string, 0)
 	aa := make([]*models.Article, 0)
 	var errCount = 0
@@ -90,13 +93,16 @@ func innerReadAllArticles() {
 		}
 
 		a := models.NewArticle()
-		a.FromText(string(buf), category, slug, fi.ModTime().Format("2006-01-02"))
-		if a.Warning != "" {
-			w := fmt.Sprintf("%s: %s", path, a.Warning)
+		content := string(buf)
+		headerLoaded := a.FromText(content, category, slug, fi.ModTime().Format("2006-01-02"))
+		if !headerLoaded {
+			w := fmt.Sprintf("%s: failed to parse header", path)
 			ww = append(ww, w)
 			logs.Warn("Article warning: %s", w)
+			logs.Warn("Content: %s", content)
 			warningCount += 1
 		}
+		a.Identify()
 		aa = append(aa, a)
 	}
 	SetCachedArticles(aa)
@@ -104,15 +110,9 @@ func innerReadAllArticles() {
 	logs.Info("Read %d articles (%d warns, %d errs).", len(paths), warningCount, errCount)
 }
 
-func ReadAllArticles() {
-	ioWaiter.Add(1)
-	go func() {
-		innerReadAllArticles()
-		ioWaiter.Done()
-	}()
-}
-
 func innerWriteArticle(a *models.Article) error {
+	ioMutex.Lock()
+	defer ioMutex.Unlock()
 	if a.Category == "" {
 		return fmt.Errorf("Category must not be empty: %+v", a)
 	}
@@ -122,7 +122,6 @@ func innerWriteArticle(a *models.Article) error {
 
 	articleDir := beego.AppConfig.String("articles_dir")
 	var categoryDir string
-	fmt.Println("CATEGORY: ", a.Category)
 	if a.Category == "-" {
 		categoryDir = ""
 	} else {
@@ -152,6 +151,37 @@ func innerWriteArticle(a *models.Article) error {
 	return nil
 }
 
+func innerRemoveArticle(a *models.Article) error {
+	ioMutex.Lock()
+	defer ioMutex.Unlock()
+	if (!a.Identified()) {
+		return fmt.Errorf("Removing article is not identified.")
+	}
+	// TODO: impl delete
+	return nil
+}
+
+func innerReplaceArticle(oldA, newA *models.Article) error {
+	ioMutex.Lock()
+	defer ioMutex.Unlock()
+	if (!oldA.Identified()) {
+		return fmt.Errorf("Old article is not identified.")
+	}
+	if (newA.Identified()) {
+		return fmt.Errorf("New article is already identified.")
+	}
+	// TODO: impl delete and create
+	return nil
+}
+
+func ReadAllArticles() {
+	ioWaiter.Add(1)
+	go func() {
+		innerReadAllArticles()
+		ioWaiter.Done()
+	}()
+}
+
 func WriteArticle(a *models.Article, ch chan<- error) {
 	ioWaiter.Add(1)
 	go func() {
@@ -160,3 +190,18 @@ func WriteArticle(a *models.Article, ch chan<- error) {
 	}()
 }
 
+func RemoveArticle(a *models.Article, ch chan<- error) {
+	ioWaiter.Add(1)
+	go func() {
+		ch<- innerRemoveArticle(a)
+		ioWaiter.Done()
+	}()
+}
+
+func ReplaceArticle(oldA, newA *models.Article, ch chan<- error) {
+	ioWaiter.Add(1)
+	go func() {
+		ch<- innerReplaceArticle(oldA, newA)
+		ioWaiter.Done()
+	}()
+}

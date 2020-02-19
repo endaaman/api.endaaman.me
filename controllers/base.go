@@ -32,6 +32,12 @@ func NewSimpleResponse(message string) *SimpleResponse {
 	return &p
 }
 
+func (c *BaseController) Respond404() {
+	c.Data["json"] = NewSimpleResponse("The resource does not exist.")
+	c.Ctx.ResponseWriter.WriteHeader(400)
+	c.ServeJSON()
+}
+
 func (c *BaseController) Respond400(message string) {
 	c.Data["json"] = NewSimpleResponse(message)
 	c.Ctx.ResponseWriter.WriteHeader(400)

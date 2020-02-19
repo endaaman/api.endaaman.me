@@ -28,13 +28,12 @@ type Header struct {
 	Date string      `json:"date" yaml:",omitempty"`
 }
 
-
 type Article struct {
 	Header
-	Slug string     `json:"slug"`
 	Category string `json:"category"`
+	Slug string     `json:"slug"`
 	Body string     `json:"body"`
-	Warning string  `json:"warning"`
+	identified bool
 }
 
 func init() {
@@ -60,7 +59,15 @@ func NewArticle() *Article {
 	return &a
 }
 
-func (a *Article) FromText(text string, category string, slug string, date string) {
+func (a *Article) Identify() {
+	a.identified = true
+}
+
+func (a *Article) Identified() bool {
+	return a.identified
+}
+
+func (a *Article) FromText(text string, category string, slug string, date string) bool {
 	a.Title = slug
 	a.Slug = slug
 	if category == "" {
@@ -74,6 +81,7 @@ func (a *Article) FromText(text string, category string, slug string, date strin
 	lines := strings.Split(text, "\n")
 	hasHeaderStart := lines[0] == HEADER_DELIMITTER
 	headerEndingLine := -1
+	// header may exist
 	if (hasHeaderStart) {
 		for i, line := range lines[1:] {
 			if line == HEADER_DELIMITTER {
@@ -81,17 +89,19 @@ func (a *Article) FromText(text string, category string, slug string, date strin
 			}
 		}
 	}
+	// confirmed header does not exist
 	if !(hasHeaderStart && headerEndingLine > 0) {
 		a.Body = text
-		return
+		return true
 	}
 
 	a.Body = strings.Join(lines[headerEndingLine+1:len(lines)], "\n")
 	headerText := strings.Join(lines[1:headerEndingLine], "\n")
 	err := yaml.Unmarshal([]byte(headerText), &a.Header)
 	if err != nil {
-		a.Warning = err.Error()
+		return false
 	}
+	return true
 }
 
 func (a *Article) Validate() map[string][]string {

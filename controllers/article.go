@@ -1,10 +1,10 @@
 package controllers
 
 import (
-	// "fmt"
+	"fmt"
 	// "net/url"
 	// "github.com/astaxie/beego"
-	"github.com/astaxie/beego/logs"
+	// "github.com/astaxie/beego/logs"
 
 	"github.com/endaaman/api.endaaman.me/models"
 	"github.com/endaaman/api.endaaman.me/services"
@@ -73,41 +73,64 @@ func (c *ArticleController) Create() {
 // @Success 200 Success
 // @Failure 400 Validation error
 // @Failure 401 Auth error
-// @router /:category/:slug [patch]
+// @router /:category/:slug [put]
 func (c *ArticleController) Update() {
 	if !c.IsAdmin {
 		c.Respond401()
 		return
 	}
 
-	req := &ArticleRequest{}
+	oldA := services.FindArticle(c.Ctx.Input.Param(":category"), c.Ctx.Input.Param(":slug"))
+	if oldA == nil {
+		c.Respond404()
+		return
+	}
+
+	req := NewArticleRequest()
 	if !c.ExpectJSON(&req) {
 		c.Respond400InvalidJSON()
 		return
 	}
 
-
-	// _, bypass := c.Ctx.Request.URL.Query()[BYPASS_PARAM]
-	// if bypass {
-	// 	c.IsAdmin = true
-	// 	logs.Warn("Bypassed to admin for development")
-	// }
-	needleCategory := c.Ctx.Input.Param(":category")
-	if needleCategory == "-" {
-		needleCategory = ""
+	newA := &req.Article
+	fmt.Printf("%+v", newA)
+	messages := newA.Validate()
+	if messages != nil {
+		c.Respond400ValidationFailure(messages)
+		return
 	}
-	needleSlug := c.Ctx.Input.Param(":slug")
-	logs.Info("Category: `%s` Slug: `%s`", needleCategory, needleSlug)
 
-	a := services.FindArticle(needleCategory, needleSlug)
-
-	c.Data["json"] = a
+	err := services.ReplaceArticle(oldA, newA)
+	if err != nil {
+		c.Respond400(err.Error())
+		return
+	}
+	c.Data["json"] = services.IdentifyArticle(newA)
 	c.ServeJSON()
+}
 
-	// a := &req.Article
-	// messages := a.Validate()
-	// if messages != nil {
-	// 	c.Respond400ValidationFailure(messages)
-	// 	return
-	// }
+
+// @Title Remove the article
+// @Success 200 Success
+// @Failure 400 Validation error
+// @Failure 401 Auth error
+// @router /:category/:slug [delete]
+func (c *ArticleController) Remove() {
+	if !c.IsAdmin {
+		c.Respond401()
+		return
+	}
+
+	oldA := services.FindArticle(c.Ctx.Input.Param(":category"), c.Ctx.Input.Param(":slug"))
+	if oldA == nil {
+		c.Respond404()
+		return
+	}
+
+	err := services.RemoveArticle(oldA)
+	if err != nil {
+		c.Respond400(err.Error())
+		return
+	}
+	c.Ctx.Output.SetStatus(200)
 }
