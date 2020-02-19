@@ -15,13 +15,16 @@ var ch = make(chan bool)
 
 func notify() {
 	logs.Info("Detect changes")
-	ReadAllArticles().Wait()
+	ReadAllArticles()
+	WaitIO()
 	ch <- true
 }
 
 func AwaitNextChange() {
+	logs.Info("Start awaiting next change and loading done")
     select {
     case <-ch:
+		logs.Info("Load done by event triggered")
     case <-time.After(3 * time.Second):
     }
 }

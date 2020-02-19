@@ -4,7 +4,6 @@ import (
 	"fmt"
 	// "errors"
 	// "encoding/json"
-	"net/url"
 	"time"
 	"strings"
 	// "regexp"
@@ -18,15 +17,15 @@ import (
 const HEADER_DELIMITTER = "---"
 
 type Header struct {
-	Title string      `json:"title" yaml:",omitempty"`
-	Tags []string     `json:"tags" yaml:",omitempty"`
-	Aliases []string  `json:"aliases" yaml:",omitempty"`
-	Digest string     `json:"digest" yaml:",omitempty"`
-	Image string      `json:"image" yaml:",omitempty"`
-	Private bool      `json:"private" yaml:",omitempty"`
-	Special bool      `json:"special" yaml:",omitempty"`
-	Priority int      `json:"priority" yaml:",omitempty"`
-	Date string       `json:"date" yaml:",omitempty"`
+	Title string     `json:"title" yaml:",omitempty"`
+	Tags []string    `json:"tags" yaml:",omitempty"`
+	Aliases []string `json:"aliases" yaml:",omitempty"`
+	Digest string    `json:"digest" yaml:",omitempty"`
+	Image string     `json:"image" yaml:",omitempty"`
+	Private bool     `json:"private" yaml:",omitempty"`
+	Special bool     `json:"special" yaml:",omitempty"`
+	Priority int     `json:"priority" yaml:",omitempty"`
+	Date string      `json:"date" yaml:",omitempty"`
 }
 
 
@@ -41,7 +40,6 @@ type Article struct {
 func init() {
 	govalidator.AddCustomRule("strict_date_str", func(field string, rule string, message string, value interface{}) error {
 		s := value.(string)
-		fmt.Println("DATE: ", s)
 		if s == "" {
 			return nil
 		}
@@ -58,15 +56,18 @@ func NewArticle() *Article {
 	a.Tags = make([]string, 0)
 	a.Aliases = make([]string, 0)
 	a.Date = time.Now().Format("2006-01-02")
+	a.Category = "-"
 	return &a
 }
 
 func (a *Article) FromText(text string, category string, slug string, date string) {
-	fmt.Printf("FROM: slug: %s %s\n", slug, date)
-
 	a.Title = slug
 	a.Slug = slug
-	a.Category = category
+	if category == "" {
+		a.Category = "-"
+	} else {
+		a.Category = category
+	}
 	a.Date = date
 
 	// var header []string
@@ -93,10 +94,11 @@ func (a *Article) FromText(text string, category string, slug string, date strin
 	}
 }
 
-func (a *Article) Validate() url.Values {
+func (a *Article) Validate() map[string][]string {
 	rules := govalidator.MapData{
 		"slug": []string{"required"},
 		"date": []string{"required", "strict_date_str"},
+		"category": []string{"required"},
 	}
 
 	opts := govalidator.Options{
@@ -113,10 +115,10 @@ func (a *Article) Validate() url.Values {
 	return nil
 }
 
-func (a *Article) ToText() string {
+func (a *Article) ToText() (string, error) {
 	buf, err := yaml.Marshal(&a.Header)
 	if err != nil {
-		fmt.Println(err.Error())
+		return "", err
 	}
 	headerText := string(buf)
 
@@ -125,5 +127,5 @@ func (a *Article) ToText() string {
 		template := "---\n%s---\n%s"
 		content = fmt.Sprintf(template, headerText, a.Body)
 	}
-	return content
+	return content, nil
 }

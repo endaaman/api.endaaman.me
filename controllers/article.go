@@ -1,40 +1,36 @@
 package controllers
 
 import (
+	// "fmt"
 	// "net/url"
-	"encoding/json"
-	"github.com/astaxie/beego"
+	// "github.com/astaxie/beego"
+	"github.com/astaxie/beego/logs"
 
 	"github.com/endaaman/api.endaaman.me/models"
 	"github.com/endaaman/api.endaaman.me/services"
 )
 
+
+type ArticleRequest struct {
+	models.Article
+}
+
 type ArticleController struct {
-	beego.Controller
+	BaseController
 	admin bool
 }
 
-func (c *ArticleController) Prepare() {
-}
-
-func (c *ArticleController) ServeJSONText(data []byte) {
-	c.Ctx.Output.Header("Content-Description", "File Transfer")
-	c.Ctx.Output.Header("Content-Type", "application/octet-stream")
-	// c.Ctx.Output.Header("Content-Disposition", "attachment; filename="+filename)
-	c.Ctx.Output.Header("Content-Transfer-Encoding", "binary")
-	c.Ctx.Output.Header("Expires", "0")
-	c.Ctx.Output.Header("Cache-Control", "must-revalidate")
-	c.Ctx.Output.Header("Pragma", "public")
-	c.Ctx.Output.Body(data)
+func NewArticleRequest() *ArticleRequest {
+	r := ArticleRequest{}
+	r.Article = *models.NewArticle()
+	return &r
 }
 
 // @Title Get all articles
 // @Success 200 {object} models.Article
 // @router / [get]
-func (c *ArticleController) Get() {
-    ch := make(chan []*models.Article)
-	go services.RetrieveArticles(ch)
-	c.Data["json"] = <-ch
+func (c *ArticleController) GetAll() {
+	c.Data["json"] = services.GetArticles()
 	c.ServeJSON()
 }
 
@@ -42,38 +38,76 @@ func (c *ArticleController) Get() {
 // @Param	article	body 	models.Article	true	"The article content"
 // @Success 201 Success
 // @Failure 400 Validation error
+// @Failure 401 Auth error
 // @router / [post]
-func (c *ArticleController) Post() {
-	a := models.NewArticle()
-	err := json.Unmarshal(c.Ctx.Input.RequestBody, a)
-	if err != nil {
-		c.Data["json"] = map[string]string{"message": err.Error()}
-		c.Ctx.ResponseWriter.WriteHeader(400)
-		c.ServeJSON()
+func (c *ArticleController) Create() {
+	if !c.IsAdmin {
+		c.Respond401()
 		return
 	}
 
+	req := NewArticleRequest()
+	if !c.ExpectJSON(&req) {
+		c.Respond400InvalidJSON()
+		return
+	}
+
+	a := &req.Article
 	messages := a.Validate()
 	if messages != nil {
-		c.Data["json"] = map[string]interface{}{"errors": messages, "message": "There are some value errors."}
-		// s, _ := json.MarshalIndent(a, "", "  ")
-		// fmt.Println(string(s))
-		c.Ctx.ResponseWriter.WriteHeader(400)
-		c.ServeJSON()
+		c.Respond400ValidationFailure(messages)
 		return
 	}
 
-	ch := make(chan error)
-	go services.AppendArticle(a, ch)
-	err = <-ch
+	err := services.AddArticle(a)
 	if err != nil {
-		c.Data["json"] = err
-		c.Ctx.ResponseWriter.WriteHeader(400)
-		c.ServeJSON()
+		c.Respond400(err.Error())
 		return
 	}
-    ch2 := make(chan []*models.Article)
-	go services.RetrieveArticles(ch2)
-	c.Data["json"] = <-ch2
+	c.Data["json"] = services.IdentifyArticle(a)
 	c.ServeJSON()
+}
+
+// @Title Update the article
+// @Param	article	body 	models.Article	true	"The article content"
+// @Success 200 Success
+// @Failure 400 Validation error
+// @Failure 401 Auth error
+// @router /:category/:slug [patch]
+func (c *ArticleController) Update() {
+	if !c.IsAdmin {
+		c.Respond401()
+		return
+	}
+
+	req := &ArticleRequest{}
+	if !c.ExpectJSON(&req) {
+		c.Respond400InvalidJSON()
+		return
+	}
+
+
+	// _, bypass := c.Ctx.Request.URL.Query()[BYPASS_PARAM]
+	// if bypass {
+	// 	c.IsAdmin = true
+	// 	logs.Warn("Bypassed to admin for development")
+	// }
+	needleCategory := c.Ctx.Input.Param(":category")
+	if needleCategory == "-" {
+		needleCategory = ""
+	}
+	needleSlug := c.Ctx.Input.Param(":slug")
+	logs.Info("Category: `%s` Slug: `%s`", needleCategory, needleSlug)
+
+	a := services.FindArticle(needleCategory, needleSlug)
+
+	c.Data["json"] = a
+	c.ServeJSON()
+
+	// a := &req.Article
+	// messages := a.Validate()
+	// if messages != nil {
+	// 	c.Respond400ValidationFailure(messages)
+	// 	return
+	// }
 }

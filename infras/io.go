@@ -14,7 +14,7 @@ import (
 )
 
 var ioWaiter = &sync.WaitGroup{}
-var reg_md = regexp.MustCompile(`\.md$`)
+var regMd = regexp.MustCompile(`\.md$`)
 
 
 // func GetReader() *sync.WaitGroup {
@@ -38,7 +38,7 @@ func dirwalk(dir string) []string {
 			continue
 		}
 		name := file.Name()
-		if reg_md.MatchString(name) {
+		if regMd.MatchString(name) {
 			paths = append(paths, filepath.Join(dir, file.Name()))
 		}
     }
@@ -46,8 +46,8 @@ func dirwalk(dir string) []string {
 }
 
 func innerReadAllArticles() {
-	var ww []string
-	var aa []*models.Article
+	ww := make([]string, 0)
+	aa := make([]*models.Article, 0)
 	var errCount = 0
 	var warningCount = 0
 	var baseDir = beego.AppConfig.String("articles_dir")
@@ -77,12 +77,16 @@ func innerReadAllArticles() {
 			save_err(path, err)
 			continue
 		}
-		slug := reg_md.ReplaceAllString(rel, "")
+		slug := regMd.ReplaceAllString(rel, "")
 		category := ""
 		splitted := strings.SplitN(slug, "/", 2)
 		if len(splitted) == 2 {
+			category = splitted[0]
 			slug = splitted[1]
-			category = splitted[1]
+			if category == "-" {
+				// skip "-" for article may duplicate
+				continue
+			}
 		}
 
 		a := models.NewArticle()
@@ -97,42 +101,62 @@ func innerReadAllArticles() {
 	}
 	SetCachedArticles(aa)
 	SetCachedWarnings(ww)
-	logs.Info("Read %d items (%d warns, %d errs).", len(paths), warningCount, errCount)
+	logs.Info("Read %d articles (%d warns, %d errs).", len(paths), warningCount, errCount)
 }
 
-func ReadAllArticles() *sync.WaitGroup {
+func ReadAllArticles() {
 	ioWaiter.Add(1)
 	go func() {
 		innerReadAllArticles()
 		ioWaiter.Done()
 	}()
-	return ioWaiter
 }
 
-func innerWriteArticle(a *models.Article) {
-	baseDir := beego.AppConfig.String("articles_dir")
-	err := os.MkdirAll(filepath.Join(baseDir, a.Category), 0777);
+func innerWriteArticle(a *models.Article) error {
+	if a.Category == "" {
+		return fmt.Errorf("Category must not be empty: %+v", a)
+	}
+	if a.Slug == "" {
+		return fmt.Errorf("Slug must not be empty: %+v", a)
+	}
+
+	articleDir := beego.AppConfig.String("articles_dir")
+	var categoryDir string
+	fmt.Println("CATEGORY: ", a.Category)
+	if a.Category == "-" {
+		categoryDir = ""
+	} else {
+		categoryDir = a.Category
+	}
+	baseDir := filepath.Join(articleDir, categoryDir)
+	err := os.MkdirAll(baseDir, 0777);
     if err != nil {
-		fmt.Println("mkdir:", err)
-		return
+		return fmt.Errorf("Failed to mkdir: %s", err.Error())
     }
 
-	mdPath := filepath.Join(baseDir, a.Category, a.Slug + ".md")
-	content := a.ToText()
+	mdPath := filepath.Join(baseDir, a.Slug + ".md")
+    _, err = os.Stat(mdPath)
+	if err == nil { // file exists
+		return fmt.Errorf("Already `%s/%s` does already exit.", a.Category, a.Slug)
+	}
+
+	content, err := a.ToText()
+    if err != nil {
+		return fmt.Errorf("Failed to serialize article: %s", err.Error())
+    }
 	err = ioutil.WriteFile(mdPath, []byte(content), 0644)
     if err != nil {
-		fmt.Println("write:", err)
-		return
+		return fmt.Errorf("Failed to write article(%s): %s", mdPath, err.Error())
     }
-	fmt.Println("write done")
+	logs.Info("Success wrote article(`%s`)", mdPath)
+	return nil
 }
 
-func WriteArticle(a *models.Article) *sync.WaitGroup {
+func WriteArticle(a *models.Article, ch chan<- error) {
 	ioWaiter.Add(1)
 	go func() {
-		innerWriteArticle(a)
+		ch<- innerWriteArticle(a)
 		ioWaiter.Done()
 	}()
-	return ioWaiter
 }
 
