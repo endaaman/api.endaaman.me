@@ -5,11 +5,15 @@ import (
 	"github.com/endaaman/api.endaaman.me/models"
 )
 
+type lockable struct {
+	mutex *sync.Mutex
+}
+
 var aa_mutex sync.RWMutex
-var ww_mutex sync.RWMutex
+var cc_mutex sync.RWMutex
 var loading = true
 var articles []*models.Article
-var warnings []string
+var categorys []*models.Category
 
 func GetCachedArticles() []*models.Article {
 	aa_mutex.RLock()
@@ -24,27 +28,15 @@ func SetCachedArticles(aa []*models.Article) {
 	aa_mutex.Unlock()
 }
 
-// func AddCachedArticle(a *models.Article) {
-// 	aa := GetCachedArticles()
-// 	aa = append(aa, a)
-// 	SetCachedArticles(aa)
-// }
-
-func GetCachedWarnings() []string {
-	ww_mutex.RLock()
-	var ww = warnings
-	ww_mutex.RUnlock()
-	return ww
+func GetCachedCategorys() []*models.Category {
+	cc_mutex.RLock()
+	var cc = categorys
+	cc_mutex.RUnlock()
+	return cc
 }
 
-func SetCachedWarnings(ww []string) {
-	ww_mutex.Lock()
-	warnings = ww
-	ww_mutex.Unlock()
+func SetCachedCategorys(cc []*models.Category) {
+	cc_mutex.Lock()
+	categorys = cc
+	cc_mutex.Unlock()
 }
-
-// func AddCachedWarning(w string) {
-// 	ww := GetCachedWarnings()
-// 	ww = append(ww, w)
-// 	SetCachedWarnings(ww)
-// }

@@ -73,3 +73,24 @@ func (c *SessionController) Login() {
 func (c *SessionController) Renew() {
 	c.Respond400("not implemented")
 }
+
+// @Title Generate hash
+// @Param	password	body 		true	"Password"
+// @Success 201 Success
+// @Failure 400 Validation error
+// @router /genhash [post]
+func (c *SessionController) GenHash() {
+	req := SessionRequest{}
+	if !c.ExpectJSON(&req) {
+		c.Respond400InvalidJSON()
+		return
+	}
+
+	hash, err := services.GeneratePasswordHash(req.Password)
+	if err != nil {
+		c.Respond400(err.Error())
+		return
+	}
+	c.Data["json"] = map[string]string{"hash": hash}
+	c.ServeJSON()
+}

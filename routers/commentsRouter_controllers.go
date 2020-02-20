@@ -72,6 +72,15 @@ func init() {
 
     beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:SessionController"] = append(beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:SessionController"],
         beego.ControllerComments{
+            Method: "GenHash",
+            Router: `/genhash`,
+            AllowHTTPMethods: []string{"post"},
+            MethodParams: param.Make(),
+            Filters: nil,
+            Params: nil})
+
+    beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:SessionController"] = append(beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:SessionController"],
+        beego.ControllerComments{
             Method: "Renew",
             Router: `/renew`,
             AllowHTTPMethods: []string{"post"},

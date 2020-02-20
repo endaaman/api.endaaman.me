@@ -29,11 +29,12 @@ type Header struct {
 }
 
 type Article struct {
+	Base
 	Header
 	CategorySlug string `json:"category_slug"`
 	Slug string         `json:"slug"`
 	Body string         `json:"body"`
-	identified bool
+	Warning string      `json:"warning"`
 }
 
 func init() {
@@ -59,15 +60,7 @@ func NewArticle() *Article {
 	return &a
 }
 
-func (a *Article) Identify() {
-	a.identified = true
-}
-
-func (a *Article) Identified() bool {
-	return a.identified
-}
-
-func (a *Article) FromText(text string, categorySlug string, slug string, date string) bool {
+func (a *Article) FromText(categorySlug, slug, date, content string) {
 	a.Title = slug
 	a.Slug = slug
 	if categorySlug == "" {
@@ -78,7 +71,7 @@ func (a *Article) FromText(text string, categorySlug string, slug string, date s
 	a.Date = date
 
 	// var header []string
-	lines := strings.Split(text, "\n")
+	lines := strings.Split(content, "\n")
 	hasHeaderStart := lines[0] == HEADER_DELIMITTER
 	headerEndingLine := -1
 	// header may exist
@@ -91,17 +84,15 @@ func (a *Article) FromText(text string, categorySlug string, slug string, date s
 	}
 	// confirmed header does not exist
 	if !(hasHeaderStart && headerEndingLine > 0) {
-		a.Body = text
-		return true
+		a.Body = content
+		return
 	}
-
 	a.Body = strings.Join(lines[headerEndingLine+1:len(lines)], "\n")
 	headerText := strings.Join(lines[1:headerEndingLine], "\n")
 	err := yaml.Unmarshal([]byte(headerText), &a.Header)
 	if err != nil {
-		return false
+		a.Warning = "Invalid header"
 	}
-	return true
 }
 
 func (a *Article) Validate() map[string][]string {

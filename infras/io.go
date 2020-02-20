@@ -15,18 +15,27 @@ import (
 
 var ioWaiter = new(sync.WaitGroup)
 var ioMutex = new(sync.Mutex)
-var regMd = regexp.MustCompile(`\.md$`)
 
 
 // func GetReader() *sync.WaitGroup {
 // 	return ioWaiter
 // }
 
+const CATEGORY_FILE_NAME = "meta.json"
+const (
+	FILE_TYPE_ARTICLE = iota
+	FILE_TYPE_CATEGORY
+	FILE_TYPE_OTHER
+)
+
 func WaitIO() {
 	ioWaiter.Wait()
 }
 
-func dirwalk(dir string) []string {
+func dirwalk(dir string, depth, limit uint) []string {
+	if depth > limit {
+		return nil
+	}
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		panic(err)
@@ -34,14 +43,12 @@ func dirwalk(dir string) []string {
 
 	var paths []string
 	for _, file := range files {
+		path := filepath.Join(dir, file.Name())
 		if file.IsDir() {
-			paths = append(paths, dirwalk(filepath.Join(dir, file.Name()))...)
+			paths = append(paths, dirwalk(path, depth + 1, limit)...)
 			continue
 		}
-		name := file.Name()
-		if regMd.MatchString(name) {
-			paths = append(paths, filepath.Join(dir, file.Name()))
-		}
+		paths = append(paths, path)
     }
     return paths
 }
@@ -49,65 +56,86 @@ func dirwalk(dir string) []string {
 func innerReadAllArticles() {
 	ioMutex.Lock()
 	defer ioMutex.Unlock()
-	ww := make([]string, 0)
 	aa := make([]*models.Article, 0)
-	var errCount = 0
-	var warningCount = 0
+	cc := make([]*models.Category, 0)
 	var baseDir = beego.AppConfig.String("articles_dir")
-	var paths = dirwalk(baseDir)
-
-	var save_err = func(path string, err error) {
-		w := fmt.Sprintf("%s: %s", path, err.Error())
-		ww = append(ww, w)
-		logs.Warn("Article error: %s", w)
-		errCount += 1
-	}
-
+	var paths = dirwalk(baseDir, 0, 1)
+	var regMd = regexp.MustCompile(`\.md$`)
 	for _, path := range paths {
-		buf, err := ioutil.ReadFile(path)
-		if err != nil {
-			continue
-		}
-
-		fi, err := os.Stat(path)
-		if err != nil {
-			save_err(path, err)
-			continue
-		}
-
+		// compute rel
 		rel, err := filepath.Rel(baseDir, path)
 		if err != nil {
-			save_err(path, err)
+			logs.Error("Failed compute rel: %s", err.Error())
 			continue
 		}
-		slug := regMd.ReplaceAllString(rel, "")
-		categorySlug := ""
-		splitted := strings.SplitN(slug, "/", 2)
-		if len(splitted) == 2 {
-			categorySlug = splitted[0]
-			slug = splitted[1]
-			if categorySlug == "-" {
-				// skip "-" for article may duplicate
+
+		// parse slugs
+		var filename string
+		var categorySlug string
+		splitted := strings.SplitN(rel, "/", 2)
+		if len(splitted) == 1 {
+			categorySlug = "-"
+			filename = splitted[0]
+		} else if len(splitted) == 2 {
+			if splitted[0] == "-" {
+				// skip "-/" dir
 				continue
 			}
+			categorySlug = splitted[0]
+			filename = splitted[1]
+		} else {
+			logs.Error("Invalid path: %s", path)
+			continue
 		}
 
-		a := models.NewArticle()
-		content := string(buf)
-		headerLoaded := a.FromText(content, categorySlug, slug, fi.ModTime().Format("2006-01-02"))
-		if !headerLoaded {
-			w := fmt.Sprintf("%s: failed to parse header", path)
-			ww = append(ww, w)
-			logs.Warn("Article warning: %s", w)
-			logs.Warn("Content: %s", content)
-			warningCount += 1
+		// ignore unnecessary
+		ignored := true
+		filetype := FILE_TYPE_OTHER
+		if regMd.MatchString(filename) {
+			filetype = FILE_TYPE_ARTICLE
+			ignored = false
 		}
-		a.Identify()
-		aa = append(aa, a)
+		if filename == CATEGORY_FILE_NAME {
+			filetype = FILE_TYPE_CATEGORY
+			ignored = false
+		}
+		if ignored {
+			continue
+		}
+
+		// start reading
+		buf, err := ioutil.ReadFile(path)
+		if err != nil {
+			logs.Error("Failed to read `%s`: %s", path, err.Error())
+			continue
+		}
+		content := string(buf)
+
+		switch filetype {
+		case FILE_TYPE_ARTICLE:
+			stat, err := os.Stat(path)
+			if err != nil {
+				logs.Error("Failed to stat `%s`: %s", path, err.Error())
+				continue
+			}
+			slug := regMd.ReplaceAllString(filename, "")
+			dateStr := stat.ModTime().Format("2006-01-02")
+			a := models.NewArticle()
+			a.FromText(categorySlug, slug, dateStr, content)
+			a.Identify()
+			aa = append(aa, a)
+		case FILE_TYPE_CATEGORY:
+			c := models.NewCategory()
+			c.Identify()
+			cc = append(cc, c)
+		default:
+			// ignore
+			continue
+		}
 	}
 	SetCachedArticles(aa)
-	SetCachedWarnings(ww)
-	logs.Info("Read %d articles (%d warns, %d errs).", len(paths), warningCount, errCount)
+	SetCachedCategorys(cc)
+	logs.Info("Read %d As and %d Cs", len(aa), len(cc))
 }
 
 func innerWriteArticle(a *models.Article) error {

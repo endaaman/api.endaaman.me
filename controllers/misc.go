@@ -2,12 +2,11 @@ package controllers
 
 import (
 	// "encoding/json"
-	"github.com/astaxie/beego"
-	"github.com/endaaman/api.endaaman.me/services"
+	// "github.com/astaxie/beego"
 )
 
 type MiscController struct {
-	beego.Controller
+	BaseController
 	admin bool
 }
 
@@ -19,8 +18,6 @@ func (c *MiscController) Prepare() {
 // @Success 200 {string[]} string[]
 // @router /warnings [get]
 func (c *MiscController) Get() {
-    ch := make(chan []string)
-	go services.RetrieveWarnings(ch)
-	c.Data["json"] = <- ch
+	c.Data["json"] = "hi"
 	c.ServeJSON()
 }
