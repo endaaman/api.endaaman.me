@@ -81,12 +81,12 @@ func innerReadAllArticles() {
 			continue
 		}
 		slug := regMd.ReplaceAllString(rel, "")
-		category := ""
+		categorySlug := ""
 		splitted := strings.SplitN(slug, "/", 2)
 		if len(splitted) == 2 {
-			category = splitted[0]
+			categorySlug = splitted[0]
 			slug = splitted[1]
-			if category == "-" {
+			if categorySlug == "-" {
 				// skip "-" for article may duplicate
 				continue
 			}
@@ -94,7 +94,7 @@ func innerReadAllArticles() {
 
 		a := models.NewArticle()
 		content := string(buf)
-		headerLoaded := a.FromText(content, category, slug, fi.ModTime().Format("2006-01-02"))
+		headerLoaded := a.FromText(content, categorySlug, slug, fi.ModTime().Format("2006-01-02"))
 		if !headerLoaded {
 			w := fmt.Sprintf("%s: failed to parse header", path)
 			ww = append(ww, w)
@@ -113,7 +113,7 @@ func innerReadAllArticles() {
 func innerWriteArticle(a *models.Article) error {
 	ioMutex.Lock()
 	defer ioMutex.Unlock()
-	if a.Category == "" {
+	if a.CategorySlug == "" {
 		return fmt.Errorf("Category must not be empty: %+v", a)
 	}
 	if a.Slug == "" {
@@ -122,10 +122,10 @@ func innerWriteArticle(a *models.Article) error {
 
 	articleDir := beego.AppConfig.String("articles_dir")
 	var categoryDir string
-	if a.Category == "-" {
+	if a.CategorySlug == "-" {
 		categoryDir = ""
 	} else {
-		categoryDir = a.Category
+		categoryDir = a.CategorySlug
 	}
 	baseDir := filepath.Join(articleDir, categoryDir)
 	err := os.MkdirAll(baseDir, 0777);
@@ -136,7 +136,7 @@ func innerWriteArticle(a *models.Article) error {
 	mdPath := filepath.Join(baseDir, a.Slug + ".md")
     _, err = os.Stat(mdPath)
 	if err == nil { // file exists
-		return fmt.Errorf("Already `%s/%s` does already exit.", a.Category, a.Slug)
+		return fmt.Errorf("Already `%s/%s` does already exit.", a.CategorySlug, a.Slug)
 	}
 
 	content, err := a.ToText()

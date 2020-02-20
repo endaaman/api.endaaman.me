@@ -30,9 +30,9 @@ type Header struct {
 
 type Article struct {
 	Header
-	Category string `json:"category"`
-	Slug string     `json:"slug"`
-	Body string     `json:"body"`
+	CategorySlug string `json:"category_slug"`
+	Slug string         `json:"slug"`
+	Body string         `json:"body"`
 	identified bool
 }
 
@@ -55,7 +55,7 @@ func NewArticle() *Article {
 	a.Tags = make([]string, 0)
 	a.Aliases = make([]string, 0)
 	a.Date = time.Now().Format("2006-01-02")
-	a.Category = "-"
+	a.CategorySlug = "-"
 	return &a
 }
 
@@ -67,13 +67,13 @@ func (a *Article) Identified() bool {
 	return a.identified
 }
 
-func (a *Article) FromText(text string, category string, slug string, date string) bool {
+func (a *Article) FromText(text string, categorySlug string, slug string, date string) bool {
 	a.Title = slug
 	a.Slug = slug
-	if category == "" {
-		a.Category = "-"
+	if categorySlug == "" {
+		a.CategorySlug = "-"
 	} else {
-		a.Category = category
+		a.CategorySlug = categorySlug
 	}
 	a.Date = date
 
@@ -108,7 +108,7 @@ func (a *Article) Validate() map[string][]string {
 	rules := govalidator.MapData{
 		"slug": []string{"required"},
 		"date": []string{"required", "strict_date_str"},
-		"category": []string{"required"},
+		"category_slug": []string{"required"},
 	}
 
 	opts := govalidator.Options{

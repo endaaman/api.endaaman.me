@@ -5,9 +5,9 @@ import (
 	"github.com/endaaman/api.endaaman.me/infras"
 )
 
-func searchArticle(aa []*models.Article, category, slug string) *models.Article {
+func searchArticle(aa []*models.Article, categorySlug, slug string) *models.Article {
 	for _, a := range aa {
-		if a.Category == category && a.Slug == slug {
+		if a.CategorySlug == categorySlug && a.Slug == slug {
 			return a
 		}
 	}
@@ -19,10 +19,10 @@ func GetArticles() []*models.Article {
     return infras.GetCachedArticles()
 }
 
-func FindArticle(category, slug string) *models.Article {
+func FindArticle(categorySlug, slug string) *models.Article {
 	infras.WaitIO()
 	aa := infras.GetCachedArticles()
-	return searchArticle(aa, category, slug)
+	return searchArticle(aa, categorySlug, slug)
 }
 
 func AddArticle(a *models.Article) error {
@@ -51,7 +51,7 @@ func RemoveArticle(a *models.Article) error {
 
 func IdentifyArticle(a *models.Article) *models.Article {
 	aa := infras.GetCachedArticles()
-	return searchArticle(aa, a.Category, a.Slug)
+	return searchArticle(aa, a.CategorySlug, a.Slug)
 }
 
 func ReplaceArticle(oldA, newA *models.Article) error {
