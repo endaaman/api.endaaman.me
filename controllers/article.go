@@ -46,22 +46,25 @@ func (c *ArticleController) Create() {
 		return
 	}
 
-	req := NewArticleRequest()
-	if !c.ExpectJSON(&req) {
+	a := models.NewArticle()
+	if !c.ExpectJSON(&a) {
 		c.Respond400InvalidJSON()
 		return
 	}
 
-	a := &req.Article
-	messages := a.Validate()
-	if messages != nil {
-		c.Respond400ValidationFailure(messages)
+	err := a.Validate()
+	if err != nil {
+		if e, ok := err.(*models.ValidationError); ok {
+			c.Respond400ValidationFailure(e)
+		} else {
+			c.Respond400e(err)
+		}
 		return
 	}
 
-	err := services.AddArticle(a)
+	err = services.AddArticle(a)
 	if err != nil {
-		c.Respond400(err.Error())
+		c.Respond400e(err)
 		return
 	}
 	c.Data["json"] = services.IdentifyArticle(a)
@@ -94,15 +97,19 @@ func (c *ArticleController) Update() {
 
 	newA := &req.Article
 	fmt.Printf("%+v", newA)
-	messages := newA.Validate()
-	if messages != nil {
-		c.Respond400ValidationFailure(messages)
+	err := newA.Validate()
+	if err != nil {
+		if e, ok := err.(*models.ValidationError); ok {
+			c.Respond400ValidationFailure(e)
+		} else {
+			c.Respond400e(err)
+		}
 		return
 	}
 
-	err := services.ReplaceArticle(oldA, newA)
+	err = services.ReplaceArticle(oldA, newA)
 	if err != nil {
-		c.Respond400(err.Error())
+		c.Respond400e(err)
 		return
 	}
 	c.Data["json"] = services.IdentifyArticle(newA)
@@ -129,7 +136,7 @@ func (c *ArticleController) Remove() {
 
 	err := services.RemoveArticle(oldA)
 	if err != nil {
-		c.Respond400(err.Error())
+		c.Respond400e(err)
 		return
 	}
 	c.Ctx.Output.SetStatus(200)

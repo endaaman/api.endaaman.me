@@ -45,7 +45,16 @@ func init() {
 
     beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:MiscController"] = append(beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:MiscController"],
         beego.ControllerComments{
-            Method: "Get",
+            Method: "GenHash",
+            Router: `/genhash`,
+            AllowHTTPMethods: []string{"post"},
+            MethodParams: param.Make(),
+            Filters: nil,
+            Params: nil})
+
+    beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:MiscController"] = append(beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:MiscController"],
+        beego.ControllerComments{
+            Method: "GetWarnings",
             Router: `/warnings`,
             AllowHTTPMethods: []string{"get"},
             MethodParams: param.Make(),
@@ -65,15 +74,6 @@ func init() {
         beego.ControllerComments{
             Method: "Login",
             Router: `/`,
-            AllowHTTPMethods: []string{"post"},
-            MethodParams: param.Make(),
-            Filters: nil,
-            Params: nil})
-
-    beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:SessionController"] = append(beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:SessionController"],
-        beego.ControllerComments{
-            Method: "GenHash",
-            Router: `/genhash`,
             AllowHTTPMethods: []string{"post"},
             MethodParams: param.Make(),
             Filters: nil,

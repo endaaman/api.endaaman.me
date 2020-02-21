@@ -1,5 +1,19 @@
 package models
 
+import (
+	"fmt"
+	"encoding/json"
+)
+
+
+type ValidationError struct {
+	Messages map[string][]string
+}
+
+func (e *ValidationError) Error() string {
+	buf, _ := json.Marshal(e.Messages)
+	return fmt.Sprintf("Validation error: %s", string(buf))
+}
 
 type Base struct {
 	identified bool

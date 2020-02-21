@@ -58,14 +58,24 @@ func innerReadAllArticles() {
 	defer ioMutex.Unlock()
 	aa := make([]*models.Article, 0)
 	cc := make([]*models.Category, 0)
+	ww := make(map[string][]string)
 	var baseDir = beego.AppConfig.String("articles_dir")
 	var paths = dirwalk(baseDir, 0, 1)
 	var regMd = regexp.MustCompile(`\.md$`)
+	var warn = func(path, message string) {
+		_, ok := ww[path]
+		if ok {
+			ww[path] = append(ww[path], message)
+		} else {
+			ww[path] = []string{message}
+		}
+		logs.Warn("[%s] %s", path, message)
+	}
 	for _, path := range paths {
 		// compute rel
 		rel, err := filepath.Rel(baseDir, path)
 		if err != nil {
-			logs.Error("Failed compute rel: %s", err.Error())
+			warn("common", fmt.Sprintf("Failed compute rel: %s", err.Error()))
 			continue
 		}
 
@@ -84,7 +94,7 @@ func innerReadAllArticles() {
 			categorySlug = splitted[0]
 			filename = splitted[1]
 		} else {
-			logs.Error("Invalid path: %s", path)
+			warn(path, "Invalid path")
 			continue
 		}
 
@@ -106,7 +116,7 @@ func innerReadAllArticles() {
 		// start reading
 		buf, err := ioutil.ReadFile(path)
 		if err != nil {
-			logs.Error("Failed to read `%s`: %s", path, err.Error())
+			warn(path, fmt.Sprintf("Failed to read: %s", err.Error()))
 			continue
 		}
 		content := string(buf)
@@ -115,17 +125,37 @@ func innerReadAllArticles() {
 		case FILE_TYPE_ARTICLE:
 			stat, err := os.Stat(path)
 			if err != nil {
-				logs.Error("Failed to stat `%s`: %s", path, err.Error())
+				warn(path, fmt.Sprintf("Failed to stat: %s", err.Error()))
 				continue
 			}
 			slug := regMd.ReplaceAllString(filename, "")
 			dateStr := stat.ModTime().Format("2006-01-02")
 			a := models.NewArticle()
-			a.FromText(categorySlug, slug, dateStr, content)
+			a.Title = slug
+			a.Slug = slug
+			a.CategorySlug = categorySlug
+			a.Date = dateStr
+			header, body, err := models.SplitArticleHeaderAndBody(content)
+			if err != nil {
+				warn(path, fmt.Sprintf("Failed to parse markdown: %s", err.Error()))
+			}
+			if header != nil {
+				a.ArticleHeader = *header
+			}
+			a.Body = body
+			err = a.Validate()
+			if err != nil {
+				warn(path, fmt.Sprintf("Invalid header: %s", err.Error()))
+			}
 			a.Identify()
 			aa = append(aa, a)
 		case FILE_TYPE_CATEGORY:
 			c := models.NewCategory()
+			c.Slug = categorySlug
+			err = c.FromJSON(content)
+			if err != nil {
+				warn(path, fmt.Sprintf("Failed to parse: %s", err.Error()))
+			}
 			c.Identify()
 			cc = append(cc, c)
 		default:
@@ -135,7 +165,8 @@ func innerReadAllArticles() {
 	}
 	SetCachedArticles(aa)
 	SetCachedCategorys(cc)
-	logs.Info("Read %d As and %d Cs", len(aa), len(cc))
+	SetCachedWarnings(ww)
+	logs.Info("Read %d As and %d Cs (%d warns)", len(aa), len(cc), len(ww))
 }
 
 func innerWriteArticle(a *models.Article) error {

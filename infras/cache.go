@@ -6,37 +6,65 @@ import (
 )
 
 type lockable struct {
-	mutex *sync.Mutex
+	mutex *sync.RWMutex
+	value interface{}
 }
 
-var aa_mutex sync.RWMutex
-var cc_mutex sync.RWMutex
-var loading = true
-var articles []*models.Article
-var categorys []*models.Category
+func newLockcable() *lockable {
+	l := lockable{}
+	l.mutex = new(sync.RWMutex)
+	return &l
+}
+
+func (l *lockable) get() interface{} {
+	l.mutex.RLock()
+	var v = l.value
+	l.mutex.RUnlock()
+	return v
+}
+
+func (l *lockable) set(v interface{}) {
+	l.mutex.Lock()
+	l.value = v
+	l.mutex.Unlock()
+}
+
+var aa = newLockcable()
+var cc = newLockcable()
+var ww = newLockcable()
 
 func GetCachedArticles() []*models.Article {
-	aa_mutex.RLock()
-	var aa = articles
-	aa_mutex.RUnlock()
-	return aa
+	v, ok := aa.get().([]*models.Article)
+	if !ok {
+		panic("Invalid type")
+	}
+	return v
 }
 
-func SetCachedArticles(aa []*models.Article) {
-	aa_mutex.Lock()
-	articles = aa
-	aa_mutex.Unlock()
+func SetCachedArticles(v []*models.Article) {
+	aa.set(v)
 }
 
 func GetCachedCategorys() []*models.Category {
-	cc_mutex.RLock()
-	var cc = categorys
-	cc_mutex.RUnlock()
-	return cc
+	v, ok := cc.get().([]*models.Category)
+	if !ok {
+		panic("Invalid type")
+	}
+	return v
 }
 
-func SetCachedCategorys(cc []*models.Category) {
-	cc_mutex.Lock()
-	categorys = cc
-	cc_mutex.Unlock()
+func SetCachedCategorys(v []*models.Category) {
+	cc.set(v)
+}
+
+func GetCachedWarnings() map[string][]string {
+	v, ok := cc.get().(map[string][]string)
+	if !ok {
+		panic("Invalid type")
+	}
+	return v
+}
+
+func SetCachedWarnings(v map[string][]string) {
+	cc.set(v)
 }

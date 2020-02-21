@@ -16,7 +16,7 @@ import (
 
 const HEADER_DELIMITTER = "---"
 
-type Header struct {
+type ArticleHeader struct {
 	Title string     `json:"title" yaml:",omitempty"`
 	Tags []string    `json:"tags" yaml:",omitempty"`
 	Aliases []string `json:"aliases" yaml:",omitempty"`
@@ -30,7 +30,7 @@ type Header struct {
 
 type Article struct {
 	Base
-	Header
+	ArticleHeader
 	CategorySlug string `json:"category_slug"`
 	Slug string         `json:"slug"`
 	Body string         `json:"body"`
@@ -38,7 +38,7 @@ type Article struct {
 }
 
 func init() {
-	govalidator.AddCustomRule("strict_date_str", func(field string, rule string, message string, value interface{}) error {
+	govalidator.AddCustomRule("strict_date_str", func(field, rule, message string, value interface{}) error {
 		s := value.(string)
 		if s == "" {
 			return nil
@@ -60,16 +60,34 @@ func NewArticle() *Article {
 	return &a
 }
 
-func (a *Article) FromText(categorySlug, slug, date, content string) {
-	a.Title = slug
-	a.Slug = slug
-	if categorySlug == "" {
-		a.CategorySlug = "-"
-	} else {
-		a.CategorySlug = categorySlug
+func SplitArticleHeaderAndBody(content string) (*ArticleHeader, string, error) {
+	// var header []string
+	lines := strings.Split(content, "\n")
+	hasHeaderStart := lines[0] == HEADER_DELIMITTER
+	headerEndingLine := -1
+	// header may exist
+	if (hasHeaderStart) {
+		for i, line := range lines[1:] {
+			if line == HEADER_DELIMITTER {
+				headerEndingLine = i + 1
+			}
+		}
 	}
-	a.Date = date
+	// not (starting and ending)
+	if !(hasHeaderStart && headerEndingLine > 0) {
+		return nil, content, nil
+	}
+	body := strings.Join(lines[headerEndingLine+1:len(lines)], "\n")
+	headerText := strings.Join(lines[1:headerEndingLine], "\n")
+	header := ArticleHeader{}
+	err := yaml.Unmarshal([]byte(headerText), &header)
+	if err != nil {
+		return nil, content, err
+	}
+	return &header, body, nil
+}
 
+func (a *Article) FromText(content string) {
 	// var header []string
 	lines := strings.Split(content, "\n")
 	hasHeaderStart := lines[0] == HEADER_DELIMITTER
@@ -87,15 +105,16 @@ func (a *Article) FromText(categorySlug, slug, date, content string) {
 		a.Body = content
 		return
 	}
+
 	a.Body = strings.Join(lines[headerEndingLine+1:len(lines)], "\n")
 	headerText := strings.Join(lines[1:headerEndingLine], "\n")
-	err := yaml.Unmarshal([]byte(headerText), &a.Header)
+	err := yaml.Unmarshal([]byte(headerText), &a.ArticleHeader)
 	if err != nil {
 		a.Warning = "Invalid header"
 	}
 }
 
-func (a *Article) Validate() map[string][]string {
+func (a *Article) Validate() error {
 	rules := govalidator.MapData{
 		"slug": []string{"required"},
 		"date": []string{"required", "strict_date_str"},
@@ -109,15 +128,16 @@ func (a *Article) Validate() map[string][]string {
 
 	v := govalidator.New(opts)
 
-	e := v.ValidateStruct()
-	if len(e) > 0 {
-		return e
+	messages := v.ValidateStruct()
+	if len(messages) > 0 {
+		err := &ValidationError{Messages: messages}
+		return err
 	}
 	return nil
 }
 
 func (a *Article) ToText() (string, error) {
-	buf, err := yaml.Marshal(&a.Header)
+	buf, err := yaml.Marshal(&a.ArticleHeader)
 	if err != nil {
 		return "", err
 	}

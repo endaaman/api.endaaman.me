@@ -7,6 +7,7 @@ import (
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
 	"github.com/endaaman/api.endaaman.me/services"
+	"github.com/endaaman/api.endaaman.me/models"
 )
 
 type BaseController struct {
@@ -44,6 +45,10 @@ func (c *BaseController) Respond400(message string) {
 	c.ServeJSON()
 }
 
+func (c *BaseController) Respond400e(err error) {
+	c.Respond400(err.Error())
+}
+
 func (c *BaseController) Respond401() {
 	c.Data["json"] = NewSimpleResponse("You are not me.")
 	c.Ctx.ResponseWriter.WriteHeader(401)
@@ -60,10 +65,10 @@ func (c *BaseController) Respond400InvalidJSON() {
 	c.Respond400("Invalid JSON format.")
 }
 
-func (c *BaseController) Respond400ValidationFailure(errors map[string][]string) {
+func (c *BaseController) Respond400ValidationFailure(err *models.ValidationError) {
 	res := ValidationFailureResponse{
 		Message: "There are some value errors.",
-		Errors: errors,
+		Errors: err.Messages,
 	}
 	c.Data["json"] = res
 	c.Ctx.ResponseWriter.WriteHeader(400)
