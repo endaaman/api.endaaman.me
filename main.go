@@ -30,8 +30,7 @@ func fillCredentials() {
 func main() {
 	fillCredentials()
 	// TODO: mkdir shared/articles and shared/private
-	infras.ReadAllArticles()
-	infras.WaitIO()
+	services.ReadAllArticles()
 	go infras.StartWatching()
 	if beego.BConfig.RunMode == "dev" {
 		beego.BConfig.WebConfig.DirectoryIndex = true

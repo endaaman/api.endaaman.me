@@ -14,6 +14,11 @@ func searchArticle(aa []*models.Article, categorySlug, slug string) *models.Arti
 	return nil
 }
 
+func ReadAllArticles() {
+	infras.ReadAllArticles()
+	infras.WaitIO()
+}
+
 func GetArticles() []*models.Article {
 	infras.WaitIO()
     return infras.GetCachedArticles()

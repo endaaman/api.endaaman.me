@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"fmt"
+	// "fmt"
 	// "encoding/json"
 	// "github.com/astaxie/beego/logs"
 	"github.com/endaaman/api.endaaman.me/services"
@@ -17,11 +17,11 @@ type FileController struct {
 // @router /* [get]
 func (c *FileController) ListDir() {
 	rel := c.Ctx.Input.Param(":splat")
-	if !services.IsDir(rel) {
-		c.Respond400(fmt.Sprintf("Can not read the path: `%s`", rel))
-		return
+	files, err := services.ListDir(rel)
+	if err != nil {
+		c.Respond400e(err)
 	}
-	c.Data["json"] = services.ListDir(rel)
+	c.Data["json"] = files
 	c.ServeJSON()
 }
 
@@ -31,10 +31,20 @@ func (c *FileController) ListDir() {
 // @router /* [delete]
 func (c *FileController) Delete() {
 	rel := c.Ctx.Input.Param(":splat")
-	if !services.IsDir(rel) {
-		c.Respond400(fmt.Sprintf("Can not read the path: `%s`", rel))
+	err := services.Delete(rel)
+	if err != nil {
+		c.Respond400e(err)
 		return
 	}
-	c.Data["json"] = "DEL"
-	c.ServeJSON()
+}
+
+
+// @Title Delte file
+// @Description delte file
+// @Param	oldName	body 		true	"new name"
+// @Param	newName	body 		true	"new name"
+// @Success 200
+// @router /rename [patch]
+func (c *FileController) Rename() {
+	println("RENAME")
 }

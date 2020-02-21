@@ -70,6 +70,15 @@ func init() {
             Filters: nil,
             Params: nil})
 
+    beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:FileController"] = append(beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:FileController"],
+        beego.ControllerComments{
+            Method: "Rename",
+            Router: `/rename`,
+            AllowHTTPMethods: []string{"patch"},
+            MethodParams: param.Make(),
+            Filters: nil,
+            Params: nil})
+
     beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:MiscController"] = append(beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:MiscController"],
         beego.ControllerComments{
             Method: "GenHash",
