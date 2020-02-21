@@ -13,20 +13,15 @@ import (
 	"github.com/endaaman/api.endaaman.me/models"
 )
 
-var ioWaiter = new(sync.WaitGroup)
-var ioMutex = new(sync.Mutex)
-
-
-// func GetReader() *sync.WaitGroup {
-// 	return ioWaiter
-// }
-
 const CATEGORY_FILE_NAME = "meta.json"
 const (
 	FILE_TYPE_ARTICLE = iota
 	FILE_TYPE_CATEGORY
 	FILE_TYPE_OTHER
 )
+
+var ioWaiter = new(sync.WaitGroup)
+var ioMutex = new(sync.Mutex)
 
 func WaitIO() {
 	ioWaiter.Wait()
@@ -152,6 +147,7 @@ func innerReadAllArticles() {
 		case FILE_TYPE_CATEGORY:
 			c := models.NewCategory()
 			c.Slug = categorySlug
+			c.Name = categorySlug
 			err = c.FromJSON(content)
 			if err != nil {
 				warn(path, fmt.Sprintf("Failed to parse: %s", err.Error()))
@@ -169,14 +165,19 @@ func innerReadAllArticles() {
 	logs.Info("Read %d As and %d Cs (%d warns)", len(aa), len(cc), len(ww))
 }
 
-func innerWriteArticle(a *models.Article) error {
+func WriteArticle(a *models.Article, ch chan<- error) {
+	ioWaiter.Add(1)
 	ioMutex.Lock()
 	defer ioMutex.Unlock()
+	defer ioWaiter.Done()
+
 	if a.CategorySlug == "" {
-		return fmt.Errorf("Category must not be empty: %+v", a)
+		ch<- fmt.Errorf("Category must not be empty: %+v", a)
+		return
 	}
 	if a.Slug == "" {
-		return fmt.Errorf("Slug must not be empty: %+v", a)
+		ch<- fmt.Errorf("Slug must not be empty: %+v", a)
+		return
 	}
 
 	articleDir := beego.AppConfig.String("articles_dir")
@@ -189,25 +190,30 @@ func innerWriteArticle(a *models.Article) error {
 	baseDir := filepath.Join(articleDir, categoryDir)
 	err := os.MkdirAll(baseDir, 0777);
     if err != nil {
-		return fmt.Errorf("Failed to mkdir: %s", err.Error())
+		ch<- fmt.Errorf("Failed to mkdir: %s", err.Error())
+		return
     }
 
 	mdPath := filepath.Join(baseDir, a.Slug + ".md")
     _, err = os.Stat(mdPath)
 	if err == nil { // file exists
-		return fmt.Errorf("Already `%s/%s` does already exit.", a.CategorySlug, a.Slug)
+		ch<- fmt.Errorf("Already `%s/%s` does already exit.", a.CategorySlug, a.Slug)
+		return
 	}
 
 	content, err := a.ToText()
     if err != nil {
-		return fmt.Errorf("Failed to serialize article: %s", err.Error())
+		ch<- fmt.Errorf("Failed to serialize article: %s", err.Error())
+		return
     }
 	err = ioutil.WriteFile(mdPath, []byte(content), 0644)
     if err != nil {
-		return fmt.Errorf("Failed to write article(%s): %s", mdPath, err.Error())
+		ch<- fmt.Errorf("Failed to write article(%s): %s", mdPath, err.Error())
+		return
     }
 	logs.Info("Success wrote article(`%s`)", mdPath)
-	return nil
+	ch<- nil
+	return
 }
 
 func innerRemoveArticle(a *models.Article) error {
@@ -237,14 +243,6 @@ func ReadAllArticles() {
 	ioWaiter.Add(1)
 	go func() {
 		innerReadAllArticles()
-		ioWaiter.Done()
-	}()
-}
-
-func WriteArticle(a *models.Article, ch chan<- error) {
-	ioWaiter.Add(1)
-	go func() {
-		ch<- innerWriteArticle(a)
 		ioWaiter.Done()
 	}()
 }

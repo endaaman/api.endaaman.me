@@ -28,7 +28,7 @@ func FindArticle(categorySlug, slug string) *models.Article {
 func AddArticle(a *models.Article) error {
 	infras.WaitIO()
 	ch := make(chan error)
-	infras.WriteArticle(a, ch)
+	go infras.WriteArticle(a, ch)
 	err := <-ch
 	if err != nil {
 		return err

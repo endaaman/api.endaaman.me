@@ -29,6 +29,7 @@ func fillCredentials() {
 
 func main() {
 	fillCredentials()
+	// TODO: mkdir shared/articles and shared/private
 	infras.ReadAllArticles()
 	infras.WaitIO()
 	go infras.StartWatching()

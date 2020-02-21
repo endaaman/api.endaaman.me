@@ -58,7 +58,7 @@ func SetCachedCategorys(v []*models.Category) {
 }
 
 func GetCachedWarnings() map[string][]string {
-	v, ok := cc.get().(map[string][]string)
+	v, ok := ww.get().(map[string][]string)
 	if !ok {
 		panic("Invalid type")
 	}
@@ -66,5 +66,5 @@ func GetCachedWarnings() map[string][]string {
 }
 
 func SetCachedWarnings(v map[string][]string) {
-	cc.set(v)
+	ww.set(v)
 }

@@ -43,6 +43,33 @@ func init() {
             Filters: nil,
             Params: nil})
 
+    beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:CategoryController"] = append(beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:CategoryController"],
+        beego.ControllerComments{
+            Method: "GetAll",
+            Router: `/`,
+            AllowHTTPMethods: []string{"get"},
+            MethodParams: param.Make(),
+            Filters: nil,
+            Params: nil})
+
+    beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:FileController"] = append(beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:FileController"],
+        beego.ControllerComments{
+            Method: "ListDir",
+            Router: `/*`,
+            AllowHTTPMethods: []string{"get"},
+            MethodParams: param.Make(),
+            Filters: nil,
+            Params: nil})
+
+    beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:FileController"] = append(beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:FileController"],
+        beego.ControllerComments{
+            Method: "Delete",
+            Router: `/*`,
+            AllowHTTPMethods: []string{"delete"},
+            MethodParams: param.Make(),
+            Filters: nil,
+            Params: nil})
+
     beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:MiscController"] = append(beego.GlobalControllerRouter["github.com/endaaman/api.endaaman.me/controllers:MiscController"],
         beego.ControllerComments{
             Method: "GenHash",

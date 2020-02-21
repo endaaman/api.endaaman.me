@@ -31,10 +31,9 @@ type ArticleHeader struct {
 type Article struct {
 	Base
 	ArticleHeader
-	CategorySlug string `json:"category_slug"`
+	CategorySlug string `json:"categorySlug"`
 	Slug string         `json:"slug"`
 	Body string         `json:"body"`
-	Warning string      `json:"warning"`
 }
 
 func init() {
@@ -87,38 +86,11 @@ func SplitArticleHeaderAndBody(content string) (*ArticleHeader, string, error) {
 	return &header, body, nil
 }
 
-func (a *Article) FromText(content string) {
-	// var header []string
-	lines := strings.Split(content, "\n")
-	hasHeaderStart := lines[0] == HEADER_DELIMITTER
-	headerEndingLine := -1
-	// header may exist
-	if (hasHeaderStart) {
-		for i, line := range lines[1:] {
-			if line == HEADER_DELIMITTER {
-				headerEndingLine = i + 1
-			}
-		}
-	}
-	// confirmed header does not exist
-	if !(hasHeaderStart && headerEndingLine > 0) {
-		a.Body = content
-		return
-	}
-
-	a.Body = strings.Join(lines[headerEndingLine+1:len(lines)], "\n")
-	headerText := strings.Join(lines[1:headerEndingLine], "\n")
-	err := yaml.Unmarshal([]byte(headerText), &a.ArticleHeader)
-	if err != nil {
-		a.Warning = "Invalid header"
-	}
-}
-
 func (a *Article) Validate() error {
 	rules := govalidator.MapData{
 		"slug": []string{"required"},
 		"date": []string{"required", "strict_date_str"},
-		"category_slug": []string{"required"},
+		"categorySlug": []string{"required"},
 	}
 
 	opts := govalidator.Options{

@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	"fmt"
+	// "fmt"
 	// "net/url"
 	// "github.com/astaxie/beego"
 	// "github.com/astaxie/beego/logs"
@@ -11,19 +11,8 @@ import (
 )
 
 
-type ArticleRequest struct {
-	models.Article
-}
-
 type ArticleController struct {
 	BaseController
-	admin bool
-}
-
-func NewArticleRequest() *ArticleRequest {
-	r := ArticleRequest{}
-	r.Article = *models.NewArticle()
-	return &r
 }
 
 // @Title Get all articles
@@ -89,14 +78,12 @@ func (c *ArticleController) Update() {
 		return
 	}
 
-	req := NewArticleRequest()
-	if !c.ExpectJSON(&req) {
+	newA := models.NewArticle()
+	if !c.ExpectJSON(&newA) {
 		c.Respond400InvalidJSON()
 		return
 	}
 
-	newA := &req.Article
-	fmt.Printf("%+v", newA)
 	err := newA.Validate()
 	if err != nil {
 		if e, ok := err.(*models.ValidationError); ok {

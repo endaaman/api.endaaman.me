@@ -19,9 +19,19 @@ func init () {
 				&controllers.ArticleController{},
 			),
 		),
+		beego.NSNamespace("/categories",
+			beego.NSInclude(
+				&controllers.CategoryController{},
+			),
+		),
 		beego.NSNamespace("/sessions",
 			beego.NSInclude(
 				&controllers.SessionController{},
+			),
+		),
+		beego.NSNamespace("/files",
+			beego.NSInclude(
+				&controllers.FileController{},
 			),
 		),
 		beego.NSNamespace("/misc",
