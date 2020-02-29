@@ -1,7 +1,8 @@
 package controllers
 
 import (
-	// "fmt"
+	"fmt"
+	// "strings"
 	// "encoding/json"
 	// "github.com/astaxie/beego/logs"
 	"github.com/endaaman/api.endaaman.me/services"
@@ -20,6 +21,7 @@ func (c *FileController) ListDir() {
 	files, err := services.ListDir(rel)
 	if err != nil {
 		c.Respond400e(err)
+		return
 	}
 	c.Data["json"] = files
 	c.ServeJSON()
@@ -31,17 +33,66 @@ func (c *FileController) ListDir() {
 // @router /* [delete]
 func (c *FileController) Delete() {
 	rel := c.Ctx.Input.Param(":splat")
-	err := services.Delete(rel)
+	err := services.DeleteFile(rel)
 	if err != nil {
 		c.Respond400e(err)
 		return
 	}
 }
 
-
-// @Title Delte file
+// @Title Upload file
 // @Description delte file
-// @Param	oldName	body 		true	"new name"
+// @Param	file	body 		true	"new file"
+// @Success 200
+// @router /* [post]
+func (c *FileController) Upload() {
+	rel := c.Ctx.Input.Param(":splat")
+	isDir := services.IsDir(rel)
+	if !isDir {
+		c.Respond400(fmt.Sprintf("Target dir `%s` is not directory", rel))
+		return
+	}
+
+	headers, err := c.GetFiles("file")
+	if err != nil {
+		c.Respond400e(err)
+		return
+	}
+	if len(headers) == 0 {
+		c.Respond400("Uploaded file is empty")
+		return
+	}
+
+	m := make(map[string]bool)
+	for _, header := range headers {
+		name := header.Filename
+		if m[name] {
+			err = fmt.Errorf("Duplicated files(%s) are uploaded", name)
+			break
+		}
+		if !m[name] {
+			m[name] = true
+		}
+	}
+	if err != nil {
+		c.Respond400e(err)
+		return
+	}
+
+	for _, header := range headers {
+		file, err := header.Open()
+		if err != nil {
+			c.Respond400e(err)
+			return
+		}
+	}
+	c.RespondSimple("len: " + string(len(files)))
+	// err := c.SaveToFile("file", rel)
+}
+
+// @Title Delete file
+// @Description delte file
+// @Param	oldName	body 		true	"old name"
 // @Param	newName	body 		true	"new name"
 // @Success 200
 // @router /rename [patch]

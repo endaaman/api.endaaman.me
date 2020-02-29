@@ -17,6 +17,6 @@ func IsDir(rel string) bool {
 	return infras.IsDir(rel)
 }
 
-func Delete(rel string) error {
-	return infras.Remove(rel)
+func DeleteFile(rel string) error {
+	return infras.DeleteFile(rel)
 }

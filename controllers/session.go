@@ -39,7 +39,7 @@ func (c *SessionController) Check() {
 }
 
 // @Title Create session
-// @Param	password	body 		true	"Password"
+// @Param	password	body	true	"Password"
 // @Success 201 Success
 // @Failure 400 Validation error
 // @router / [post]

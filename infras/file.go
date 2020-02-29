@@ -2,8 +2,9 @@ package infras
 
 import (
     "os"
-    // "io"
+    "io"
     "fmt"
+	"multipart"
     // "regexp"
     // "strings"
     "sync"
@@ -54,7 +55,7 @@ func IsDir(rel string) bool {
 	return <-ch
 }
 
-func Remove(rel string) error {
+func DeleteFile(rel string) error {
 	ch := make(chan error)
 	go func() {
 		fileMutex.Lock()
@@ -63,6 +64,28 @@ func Remove(rel string) error {
 		err := os.Remove(target)
 		if err != nil {
 			ch<- fmt.Errorf("Could not remove item: %s", err.Error())
+			return
+		}
+		ch<- nil
+	}()
+	return <-ch
+}
+
+func SaveFile(rel string, file multipart.File) error {
+	ch := make(chan error)
+	go func() {
+		fileMutex.Lock()
+		defer fileMutex.Unlock()
+		target := filepath.Join(beego.AppConfig.String("private_dir"), rel)
+		dst, err := os.Create(target)
+		defer dst.Close()
+		if err != nil {
+			ch<- err
+			return
+		}
+		_, err := io.Copy(dst, file)
+		if err != nil {
+			ch<- err
 			return
 		}
 		ch<- nil
