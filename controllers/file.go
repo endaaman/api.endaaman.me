@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"fmt"
+	// "mime/multipart"
 	// "strings"
 	// "encoding/json"
 	// "github.com/astaxie/beego/logs"
@@ -79,15 +80,24 @@ func (c *FileController) Upload() {
 		return
 	}
 
+	if len(headers) < 1 {
+		c.Respond400("No files uploaded")
+		return
+	}
+
 	for _, header := range headers {
 		file, err := header.Open()
 		if err != nil {
 			c.Respond400e(err)
 			return
 		}
+		err = services.SaveToFile(header.Filename, file)
+		if err != nil {
+			c.Respond400e(err)
+			return
+		}
 	}
-	c.RespondSimple("len: " + string(len(files)))
-	// err := c.SaveToFile("file", rel)
+	c.RespondSimple("success")
 }
 
 // @Title Delete file

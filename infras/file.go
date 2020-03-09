@@ -4,7 +4,7 @@ import (
     "os"
     "io"
     "fmt"
-	"multipart"
+	"mime/multipart"
     // "regexp"
     // "strings"
     "sync"
@@ -71,7 +71,7 @@ func DeleteFile(rel string) error {
 	return <-ch
 }
 
-func SaveFile(rel string, file multipart.File) error {
+func SaveToFile(rel string, file multipart.File) error {
 	ch := make(chan error)
 	go func() {
 		fileMutex.Lock()
@@ -83,7 +83,7 @@ func SaveFile(rel string, file multipart.File) error {
 			ch<- err
 			return
 		}
-		_, err := io.Copy(dst, file)
+		_, err = io.Copy(dst, file)
 		if err != nil {
 			ch<- err
 			return

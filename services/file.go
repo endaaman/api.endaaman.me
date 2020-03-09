@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"mime/multipart"
 	"github.com/endaaman/api.endaaman.me/models"
 	"github.com/endaaman/api.endaaman.me/infras"
 )
@@ -19,4 +20,8 @@ func IsDir(rel string) bool {
 
 func DeleteFile(rel string) error {
 	return infras.DeleteFile(rel)
+}
+
+func SaveToFile(rel string, file multipart.File) error {
+	return infras.SaveToFile(rel, file)
 }
