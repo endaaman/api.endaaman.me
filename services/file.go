@@ -25,3 +25,8 @@ func DeleteFile(rel string) error {
 func SaveToFile(rel string, file multipart.File) error {
 	return infras.SaveToFile(rel, file)
 }
+
+func Exists(rel string) bool {
+	return infras.Exists(rel)
+}
+

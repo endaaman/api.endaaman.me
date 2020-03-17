@@ -39,21 +39,32 @@ func ListDir(rel string) []*models.File {
 	return <-ch
 }
 
-func IsDir(rel string) bool {
-	ch := make(chan bool)
+func getStat(rel string) os.FileInfo {
+	ch := make(chan os.FileInfo)
 	go func() {
 		fileMutex.Lock()
 		defer fileMutex.Unlock()
 		target := filepath.Join(beego.AppConfig.String("private_dir"), rel)
 		stat, err := os.Stat(target)
 		if err != nil {
-			ch<- false
+			ch<- nil
 			return
 		}
-		ch<- stat.IsDir()
+		ch<- stat
 	}()
 	return <-ch
 }
+
+func IsDir(rel string) bool {
+	stat := getStat(rel)
+	return stat != nil && stat.IsDir()
+}
+
+func Exists(rel string) bool {
+	stat := getStat(rel)
+	return stat != nil
+}
+
 
 func DeleteFile(rel string) error {
 	ch := make(chan error)

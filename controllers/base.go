@@ -1,7 +1,7 @@
 package controllers
 
 import (
-	// "fmt"
+	"fmt"
 	"encoding/json"
 	"strings"
 	"github.com/astaxie/beego"
@@ -48,6 +48,10 @@ func (c *BaseController) Respond400(message string) {
 	c.Data["json"] = NewSimpleResponse(message)
 	c.Ctx.ResponseWriter.WriteHeader(400)
 	c.ServeJSON()
+}
+
+func (c *BaseController) Respond400f(format string, args ...interface{}) {
+	c.Respond400(fmt.Sprintf(format, args...))
 }
 
 func (c *BaseController) Respond400e(err error) {

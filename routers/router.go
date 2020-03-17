@@ -40,5 +40,7 @@ func init () {
 			),
 		),
 	)
+
+	beego.ErrorController(&controllers.ErrorController{})
 	beego.AddNamespace(ns)
 }

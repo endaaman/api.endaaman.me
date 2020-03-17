@@ -130,14 +130,12 @@ func innerReadAllArticles() {
 			a.Slug = slug
 			a.CategorySlug = categorySlug
 			a.Date = dateStr
-			header, body, err := models.SplitArticleHeaderAndBody(content)
-			if err != nil {
-				warn(path, fmt.Sprintf("Failed to parse markdown: %s", err.Error()))
+
+			warning := a.LoadFromContent(content)
+			if warning != "" {
+				warn(path, fmt.Sprintf("Failed to parse markdown: %s", warning))
 			}
-			if header != nil {
-				a.ArticleHeader = *header
-			}
-			a.Body = body
+
 			err = a.Validate()
 			if err != nil {
 				warn(path, fmt.Sprintf("Invalid header: %s", err.Error()))

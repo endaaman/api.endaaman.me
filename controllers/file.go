@@ -43,7 +43,7 @@ func (c *FileController) Delete() {
 
 // @Title Upload file
 // @Description delte file
-// @Param	file	body 		true	"new file"
+// @Param	files	formData 	true		files
 // @Success 200
 // @router /* [post]
 func (c *FileController) Upload() {
@@ -54,9 +54,9 @@ func (c *FileController) Upload() {
 		return
 	}
 
-	headers, err := c.GetFiles("file")
+	headers, err := c.GetFiles("files")
 	if err != nil {
-		c.Respond400e(err)
+		c.Respond400f("Uploaded files should be under name `files`: %s", err.Error())
 		return
 	}
 	if len(headers) == 0 {
@@ -74,7 +74,12 @@ func (c *FileController) Upload() {
 		if !m[name] {
 			m[name] = true
 		}
+		if services.Exists(name) {
+			err = fmt.Errorf("The file(%s) already exists.", name)
+			break
+		}
 	}
+
 	if err != nil {
 		c.Respond400e(err)
 		return
@@ -88,12 +93,12 @@ func (c *FileController) Upload() {
 	for _, header := range headers {
 		file, err := header.Open()
 		if err != nil {
-			c.Respond400e(err)
+			c.Respond400f("Failed to open file `%s`:  %v", header.Filename, err)
 			return
 		}
 		err = services.SaveToFile(header.Filename, file)
 		if err != nil {
-			c.Respond400e(err)
+			c.Respond400f("Failed to save file `%s`:  %v", header.Filename, err)
 			return
 		}
 	}

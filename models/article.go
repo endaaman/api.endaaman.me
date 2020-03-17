@@ -59,7 +59,7 @@ func NewArticle() *Article {
 	return &a
 }
 
-func SplitArticleHeaderAndBody(content string) (*ArticleHeader, string, error) {
+func splitArticleContent(content string) (*ArticleHeader, string, string) {
 	// var header []string
 	lines := strings.Split(content, "\n")
 	hasHeaderStart := lines[0] == HEADER_DELIMITTER
@@ -74,16 +74,25 @@ func SplitArticleHeaderAndBody(content string) (*ArticleHeader, string, error) {
 	}
 	// not (starting and ending)
 	if !(hasHeaderStart && headerEndingLine > 0) {
-		return nil, content, nil
+		return nil, content, ""
 	}
 	body := strings.Join(lines[headerEndingLine+1:len(lines)], "\n")
 	headerText := strings.Join(lines[1:headerEndingLine], "\n")
 	header := ArticleHeader{}
 	err := yaml.Unmarshal([]byte(headerText), &header)
 	if err != nil {
-		return nil, content, err
+		return nil, content, err.Error()
 	}
-	return &header, body, nil
+	return &header, body, ""
+}
+
+func (a *Article) LoadFromContent(content string) string {
+	header, body, warning := splitArticleContent(content)
+	if header != nil {
+		a.ArticleHeader = *header
+	}
+	a.Body = body
+	return warning
 }
 
 func (a *Article) Validate() error {
