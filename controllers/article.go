@@ -94,7 +94,7 @@ func (c *ArticleController) Update() {
 		return
 	}
 
-	err = services.ReplaceArticle(oldA, newA)
+	err = services.UpdateArticle(oldA, newA)
 	if err != nil {
 		c.Respond400e(err)
 		return

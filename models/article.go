@@ -1,9 +1,9 @@
 package models
 
 import (
-	"fmt"
-	// "errors"
 	// "encoding/json"
+	// "errors"
+	"fmt"
 	"time"
 	"strings"
 	// "regexp"
@@ -25,7 +25,6 @@ type ArticleHeader struct {
 	Private bool     `json:"private" yaml:",omitempty"`
 	Special bool     `json:"special" yaml:",omitempty"`
 	Priority int     `json:"priority" yaml:",omitempty"`
-	Date string      `json:"date" yaml:",omitempty"`
 }
 
 type Article struct {
@@ -33,6 +32,7 @@ type Article struct {
 	ArticleHeader
 	CategorySlug string `json:"categorySlug"`
 	Slug string         `json:"slug"`
+	Date string         `json:"date"`
 	Body string         `json:"body"`
 }
 
@@ -59,7 +59,27 @@ func NewArticle() *Article {
 	return &a
 }
 
-func splitArticleContent(content string) (*ArticleHeader, string, string) {
+func (a *Article) GetBaseDir() string {
+	if a.CategorySlug == "-" {
+		return ""
+	}
+	return a.CategorySlug
+}
+
+func (a *Article) GetPath() string {
+	base := fmt.Sprintf("%s_%s.md", a.Date, a.Slug)
+	if a.CategorySlug == "-" {
+		return base
+	}
+	return a.CategorySlug + "/" + base
+}
+
+func (a *Article) JointedSlug() string {
+	return a.CategorySlug + "/" + a.Slug
+}
+
+
+func (a *Article) LoadFromContent(content string) string {
 	// var header []string
 	lines := strings.Split(content, "\n")
 	hasHeaderStart := lines[0] == HEADER_DELIMITTER
@@ -74,25 +94,17 @@ func splitArticleContent(content string) (*ArticleHeader, string, string) {
 	}
 	// not (starting and ending)
 	if !(hasHeaderStart && headerEndingLine > 0) {
-		return nil, content, ""
+		return ""
 	}
 	body := strings.Join(lines[headerEndingLine+1:len(lines)], "\n")
 	headerText := strings.Join(lines[1:headerEndingLine], "\n")
-	header := ArticleHeader{}
-	err := yaml.Unmarshal([]byte(headerText), &header)
+	err := yaml.Unmarshal([]byte(headerText), &a.ArticleHeader)
 	if err != nil {
-		return nil, content, err.Error()
-	}
-	return &header, body, ""
-}
-
-func (a *Article) LoadFromContent(content string) string {
-	header, body, warning := splitArticleContent(content)
-	if header != nil {
-		a.ArticleHeader = *header
+		a.Body = content
+		return fmt.Sprintf("Failed to parse header: %s", err.Error())
 	}
 	a.Body = body
-	return warning
+	return ""
 }
 
 func (a *Article) Validate() error {

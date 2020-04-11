@@ -3,6 +3,7 @@ package infras
 import (
     "os"
     "regexp"
+    "sort"
     "fmt"
     "strings"
     "sync"
@@ -11,6 +12,7 @@ import (
     "github.com/astaxie/beego"
     "github.com/astaxie/beego/logs"
 	"github.com/endaaman/api.endaaman.me/models"
+	"github.com/endaaman/api.endaaman.me/utils"
 )
 
 const CATEGORY_FILE_NAME = "meta.json"
@@ -56,7 +58,7 @@ func innerReadAllArticles() {
 	ww := make(map[string][]string)
 	var baseDir = beego.AppConfig.String("articles_dir")
 	var paths = dirwalk(baseDir, 0, 1)
-	var regMd = regexp.MustCompile(`\.md$`)
+	var regArticleFile = regexp.MustCompile(`^(\d\d\d\d-\d\d-\d\d)_(\S+)\.md$`)
 	var warn = func(path, message string) {
 		_, ok := ww[path]
 		if ok {
@@ -66,6 +68,8 @@ func innerReadAllArticles() {
 		}
 		logs.Warn("[%s] %s", path, message)
 	}
+
+	sort.Slice(paths, func(i, j int) bool { return paths[i] < paths[j] })
 	for _, path := range paths {
 		// compute rel
 		rel, err := filepath.Rel(baseDir, path)
@@ -96,7 +100,7 @@ func innerReadAllArticles() {
 		// ignore unnecessary
 		ignored := true
 		filetype := FILE_TYPE_OTHER
-		if regMd.MatchString(filename) {
+		if regArticleFile.MatchString(filename) {
 			filetype = FILE_TYPE_ARTICLE
 			ignored = false
 		}
@@ -118,13 +122,13 @@ func innerReadAllArticles() {
 
 		switch filetype {
 		case FILE_TYPE_ARTICLE:
-			stat, err := os.Stat(path)
-			if err != nil {
-				warn(path, fmt.Sprintf("Failed to stat: %s", err.Error()))
+			matched := regArticleFile.FindStringSubmatch(filename)
+			if len(matched) != 3 {
+				warn(path, "Invalid markdown file")
 				continue
 			}
-			slug := regMd.ReplaceAllString(filename, "")
-			dateStr := stat.ModTime().Format("2006-01-02")
+			dateStr := matched[1]
+			slug := matched[2]
 			a := models.NewArticle()
 			a.Title = slug
 			a.Slug = slug
@@ -133,12 +137,12 @@ func innerReadAllArticles() {
 
 			warning := a.LoadFromContent(content)
 			if warning != "" {
-				warn(path, fmt.Sprintf("Failed to parse markdown: %s", warning))
+				warn(path, fmt.Sprintf("Invalid header: %s", warning))
 			}
-
 			err = a.Validate()
 			if err != nil {
-				warn(path, fmt.Sprintf("Invalid header: %s", err.Error()))
+				warn(path, fmt.Sprintf("Validation failed: %s", err.Error()))
+				continue
 			}
 			a.Identify()
 			aa = append(aa, a)
@@ -163,55 +167,40 @@ func innerReadAllArticles() {
 	logs.Info("Read %d As and %d Cs (%d warns)", len(aa), len(cc), len(ww))
 }
 
-func WriteArticle(a *models.Article, ch chan<- error) {
-	ioWaiter.Add(1)
+func innerWriteArticle(a *models.Article) error {
 	ioMutex.Lock()
 	defer ioMutex.Unlock()
-	defer ioWaiter.Done()
 
 	if a.CategorySlug == "" {
-		ch<- fmt.Errorf("Category must not be empty: %+v", a)
-		return
+		return fmt.Errorf("Category must not be empty: %+v", a)
 	}
 	if a.Slug == "" {
-		ch<- fmt.Errorf("Slug must not be empty: %+v", a)
-		return
+		return fmt.Errorf("Slug must not be empty: %+v", a)
 	}
 
 	articleDir := beego.AppConfig.String("articles_dir")
-	var categoryDir string
-	if a.CategorySlug == "-" {
-		categoryDir = ""
-	} else {
-		categoryDir = a.CategorySlug
-	}
-	baseDir := filepath.Join(articleDir, categoryDir)
-	err := os.MkdirAll(baseDir, 0777);
+	baseDir := filepath.Join(articleDir, a.GetBaseDir())
+	err := utils.EnsureDir(baseDir);
     if err != nil {
-		ch<- fmt.Errorf("Failed to mkdir: %s", err.Error())
-		return
+		return fmt.Errorf("Failed to mkdir: %s", err.Error())
     }
 
-	mdPath := filepath.Join(baseDir, a.Slug + ".md")
-    _, err = os.Stat(mdPath)
-	if err == nil { // file exists
-		ch<- fmt.Errorf("Already `%s/%s` does already exit.", a.CategorySlug, a.Slug)
-		return
+	mdPath := filepath.Join(articleDir, a.GetPath())
+	if utils.FileExists(mdPath) { // file exists
+		return fmt.Errorf("File `%s` does already exit.", a.GetPath())
 	}
 
 	content, err := a.ToText()
     if err != nil {
-		ch<- fmt.Errorf("Failed to serialize article: %s", err.Error())
-		return
+		return fmt.Errorf("Failed to serialize article: %s", err.Error())
     }
 	err = ioutil.WriteFile(mdPath, []byte(content), 0644)
     if err != nil {
-		ch<- fmt.Errorf("Failed to write article(%s): %s", mdPath, err.Error())
-		return
+		return fmt.Errorf("Failed to write article(%s): %s", mdPath, err.Error())
     }
-	logs.Info("Success wrote article(`%s`)", mdPath)
-	ch<- nil
-	return
+
+	logs.Info("Succeeded to write article(`%s`)", mdPath)
+	return nil
 }
 
 func innerRemoveArticle(a *models.Article) error {
@@ -220,11 +209,20 @@ func innerRemoveArticle(a *models.Article) error {
 	if (!a.Identified()) {
 		return fmt.Errorf("Removing article is not identified.")
 	}
-	// TODO: impl delete
+
+	articlesDir := beego.AppConfig.String("articles_dir")
+	path := filepath.Join(articlesDir, a.GetPath())
+
+	err := os.Remove(path)
+	if err != nil {
+		return fmt.Errorf("Failed to remove article file(%s): %s", path, err.Error())
+	}
+
+	logs.Info("Succeeded to remove article(`%s`)", path)
 	return nil
 }
 
-func innerReplaceArticle(oldA, newA *models.Article) error {
+func innerUpdateArticle(oldA, newA *models.Article) error {
 	ioMutex.Lock()
 	defer ioMutex.Unlock()
 	if (!oldA.Identified()) {
@@ -233,8 +231,65 @@ func innerReplaceArticle(oldA, newA *models.Article) error {
 	if (newA.Identified()) {
 		return fmt.Errorf("New article is already identified.")
 	}
-	// TODO: impl delete and create
+
+	articlesDir := beego.AppConfig.String("articles_dir")
+
+	oldPath := filepath.Join(articlesDir, oldA.GetPath())
+	newPath := filepath.Join(articlesDir, newA.GetPath())
+
+	newBaseDir := filepath.Join(articlesDir, newA.GetBaseDir())
+	err := utils.EnsureDir(newBaseDir)
+	if err != nil {
+		return fmt.Errorf("Failed to create category dir: %s", err.Error())
+	}
+
+	if !utils.FileExists(oldPath) {
+		return fmt.Errorf("Article `%s` does not exist in `%s`", oldA.JointedSlug(), newPath)
+	}
+
+	// if needed to move file
+	fileChanged := oldPath != newPath
+	if (fileChanged) {
+		if utils.FileExists(newPath) {
+			return fmt.Errorf("Already file exists in: %s", newPath)
+		}
+	}
+
+	err = utils.EnsureDir(newBaseDir)
+	if err != nil {
+		return fmt.Errorf("Failed to ensure dir: %s", err.Error())
+	}
+
+	// 1. move file if needed
+	if (fileChanged) {
+		err = os.Rename(oldPath, newPath)
+		if err != nil {
+			return fmt.Errorf(
+				"Failed to move file from `%s` to `%s`: %s",
+				oldPath, newPath, err.Error())
+		}
+	}
+
+	content, err := newA.ToText()
+    if err != nil {
+		return fmt.Errorf("Failed to serialize article: %s", err.Error())
+    }
+
+	err = ioutil.WriteFile(newPath, []byte(content), 0644)
+    if err != nil {
+		return fmt.Errorf("Failed to write article(%s): %s", newPath, err.Error())
+    }
+
+	logs.Info("Succeeded to update article(`%s` -> `%s`)", oldPath, newPath)
 	return nil
+}
+
+func WriteArticle(a *models.Article, ch chan<- error) {
+	ioWaiter.Add(1)
+	go func() {
+		ch<- innerWriteArticle(a)
+		ioWaiter.Done()
+	}()
 }
 
 func ReadAllArticles() {
@@ -253,10 +308,10 @@ func RemoveArticle(a *models.Article, ch chan<- error) {
 	}()
 }
 
-func ReplaceArticle(oldA, newA *models.Article, ch chan<- error) {
+func UpdateArticle(oldA, newA *models.Article, ch chan<- error) {
 	ioWaiter.Add(1)
 	go func() {
-		ch<- innerReplaceArticle(oldA, newA)
+		ch<- innerUpdateArticle(oldA, newA)
 		ioWaiter.Done()
 	}()
 }

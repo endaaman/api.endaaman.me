@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"github.com/endaaman/api.endaaman.me/models"
 	"github.com/endaaman/api.endaaman.me/infras"
 )
@@ -32,6 +33,11 @@ func FindArticle(categorySlug, slug string) *models.Article {
 
 func AddArticle(a *models.Article) error {
 	infras.WaitIO()
+	aa := infras.GetCachedArticles()
+	oldA := searchArticle(aa, a.CategorySlug, a.Slug)
+	if oldA != nil {
+		return fmt.Errorf("Article `%s/%s` already exists.", a.CategorySlug, a.Slug)
+	}
 	ch := make(chan error)
 	go infras.WriteArticle(a, ch)
 	err := <-ch
@@ -59,9 +65,18 @@ func IdentifyArticle(a *models.Article) *models.Article {
 	return searchArticle(aa, a.CategorySlug, a.Slug)
 }
 
-func ReplaceArticle(oldA, newA *models.Article) error {
+func UpdateArticle(oldA, newA *models.Article) error {
+	infras.WaitIO()
+	aa := infras.GetCachedArticles()
+	slugChanged := newA.JointedSlug() != oldA.JointedSlug()
+	if slugChanged {
+		existingA := searchArticle(aa, newA.CategorySlug, newA.Slug)
+		if existingA != nil {
+			return fmt.Errorf("Article `%s` already exists.", newA.JointedSlug())
+		}
+	}
 	ch := make(chan error)
-	infras.ReplaceArticle(oldA, newA, ch)
+	infras.UpdateArticle(oldA, newA, ch)
 	err := <-ch
 	if err != nil {
 		return err
