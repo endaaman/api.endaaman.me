@@ -30,13 +30,7 @@ func WaitIO() {
 	ioWaiter.Wait()
 }
 
-type fileItem struct {
-	baseDir  string
-	relative string
-	file     os.FileInfo
-}
-
-func dirwalk(base, dir string, depth, limit uint) []*fileItem {
+func dirwalk(base, dir string, depth, limit uint) []string {
 	if depth > limit {
 		return nil
 	}
@@ -45,44 +39,45 @@ func dirwalk(base, dir string, depth, limit uint) []*fileItem {
 		panic(err)
 	}
 
-	var items []*fileItem
+	var items []string
 	for _, file := range files {
 		rel := filepath.Join(dir, file.Name())
 		if file.IsDir() {
 			items = append(items, dirwalk(base, rel, depth+1, limit)...)
 			continue
 		}
-		items = append(items, &fileItem{base, rel, file})
+		items = append(items, rel)
 	}
 	return items
 }
 
-func appendWarning(ww map[string][]string, item *fileItem, message string) {
-	_, ok := ww[item.relative]
+func appendWarning(ww map[string][]string, item string, message string) {
+	_, ok := ww[item]
 	if ok {
-		ww[item.relative] = append(ww[item.relative], message)
+		ww[item] = append(ww[item], message)
 	} else {
-		ww[item.relative] = []string{message}
+		ww[item] = []string{message}
 	}
-	logs.Warn("[%s] %s", item.relative, message)
+	logs.Warn("[%s] %s", item, message)
 }
 
-func loadArticles(items []*fileItem, ww map[string][]string) []*models.Article {
-	var regMarkdown = regexp.MustCompile(`^\S+\.md$`)
-	var regArticleFile = regexp.MustCompile(`^(\d\d\d\d-\d\d-\d\d)_(\S+)\.md$`)
+func loadArticles(items []string, ww map[string][]string) []*models.Article {
+	baseDir := beego.AppConfig.String("articles_dir")
+	regMarkdown := regexp.MustCompile(`^\S+\.md$`)
+	regArticleFile := regexp.MustCompile(`^(\d\d\d\d-\d\d-\d\d)_(\S+)\.md$`)
 
 	aa := make([]*models.Article, 0)
 	for _, item := range items {
 		var filename string
 		var categorySlug string
-		splitted := strings.SplitN(item.relative, "/", 2)
+		splitted := strings.SplitN(item, "/", 2)
 		if len(splitted) == 1 {
 			categorySlug = "-"
 			filename = splitted[0]
 		} else if len(splitted) == 2 {
 			if splitted[0] == "-" {
 				// skip "-/" dir
-				logs.Debug("Ignore `-` dir: %s", item.relative)
+				logs.Debug("Ignore `-` dir: %s", item)
 				continue
 			}
 			categorySlug = splitted[0]
@@ -100,7 +95,7 @@ func loadArticles(items []*fileItem, ww map[string][]string) []*models.Article {
 			continue
 		}
 
-		buf, err := ioutil.ReadFile(filepath.Join(item.baseDir, item.relative))
+		buf, err := ioutil.ReadFile(filepath.Join(baseDir, item))
 		if err != nil {
 			appendWarning(ww, item, fmt.Sprintf("Failed to read file: %s", err.Error()))
 			continue
@@ -130,8 +125,9 @@ func loadArticles(items []*fileItem, ww map[string][]string) []*models.Article {
 	return aa
 }
 
-func loadCategories(items []*fileItem, ww map[string][]string) []*models.Category {
-	var regMeta = regexp.MustCompile(`^meta\.json$`)
+func loadCategories(items []string, ww map[string][]string) []*models.Category {
+	baseDir := beego.AppConfig.String("articles_dir")
+	regMeta := regexp.MustCompile(`^meta\.json$`)
 	cc := make([]*models.Category, 0)
 
 	const (
@@ -141,7 +137,7 @@ func loadCategories(items []*fileItem, ww map[string][]string) []*models.Categor
 	)
 
 	for _, item := range items {
-		splitted := strings.SplitN(item.relative, "/", 2)
+		splitted := strings.SplitN(item, "/", 2)
 		var slug string
 		var filename string
 		if len(splitted) == 1 {
@@ -159,7 +155,7 @@ func loadCategories(items []*fileItem, ww map[string][]string) []*models.Categor
 			continue
 		}
 
-		buf, err := ioutil.ReadFile(filepath.Join(item.baseDir, item.relative))
+		buf, err := ioutil.ReadFile(filepath.Join(baseDir, item))
 		if err != nil {
 			appendWarning(ww, item, fmt.Sprintf("Failed to read file: %s", err.Error()))
 			continue
@@ -179,10 +175,10 @@ func innerReadAllArticles() {
 	ioMutex.Lock()
 	defer ioMutex.Unlock()
 	ww := make(map[string][]string)
-	var baseDir = beego.AppConfig.String("articles_dir")
-	var items = dirwalk(baseDir, ".", 0, 1)
+	baseDir := beego.AppConfig.String("articles_dir")
+	items := dirwalk(baseDir, ".", 0, 1)
 
-	sort.Slice(items, func(i, j int) bool { return items[i].relative < items[j].relative })
+	sort.Slice(items, func(i, j int) bool { return items[i] < items[j] })
 
 	aa := loadArticles(items, ww)
 	cc := loadCategories(items, ww)
