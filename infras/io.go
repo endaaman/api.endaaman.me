@@ -48,37 +48,31 @@ func dirwalk(base, dir string, depth, limit uint) []*fileItem {
 	var items []*fileItem
 	for _, file := range files {
 		rel := filepath.Join(dir, file.Name())
-		items = append(items, &fileItem{base, rel, file})
 		if file.IsDir() {
 			items = append(items, dirwalk(base, rel, depth+1, limit)...)
 			continue
 		}
+		items = append(items, &fileItem{base, rel, file})
 	}
 	return items
 }
 
-func innerReadAllArticles() {
-	ioMutex.Lock()
-	defer ioMutex.Unlock()
-	aa := make([]*models.Article, 0)
-	cc := make([]*models.Category, 0)
-	ww := make(map[string][]string)
-	var baseDir = beego.AppConfig.String("articles_dir")
-	var items = dirwalk(baseDir, ".", 0, 1)
-	var regArticleFile = regexp.MustCompile(`^(\d\d\d\d-\d\d-\d\d)_(\S+)\.md$`)
-	var warn = func(item *fileItem, message string) {
-		_, ok := ww[item.relative]
-		if ok {
-			ww[item.relative] = append(ww[item.relative], message)
-		} else {
-			ww[item.relative] = []string{message}
-		}
-		logs.Warn("[%s] %s", item.relative, message)
+func appendWarning(ww map[string][]string, item *fileItem, message string) {
+	_, ok := ww[item.relative]
+	if ok {
+		ww[item.relative] = append(ww[item.relative], message)
+	} else {
+		ww[item.relative] = []string{message}
 	}
+	logs.Warn("[%s] %s", item.relative, message)
+}
 
-	sort.Slice(items, func(i, j int) bool { return items[i].relative < items[j].relative })
+func loadArticles(items []*fileItem, ww map[string][]string) []*models.Article {
+	var regMarkdown = regexp.MustCompile(`^\S+\.md$`)
+	var regArticleFile = regexp.MustCompile(`^(\d\d\d\d-\d\d-\d\d)_(\S+)\.md$`)
+
+	aa := make([]*models.Article, 0)
 	for _, item := range items {
-		// parse slugs
 		var filename string
 		var categorySlug string
 		splitted := strings.SplitN(item.relative, "/", 2)
@@ -88,74 +82,111 @@ func innerReadAllArticles() {
 		} else if len(splitted) == 2 {
 			if splitted[0] == "-" {
 				// skip "-/" dir
-				warn(item, "Ignore `-` dir")
+				logs.Debug("Ignore `-` dir: %s", item.relative)
 				continue
 			}
 			categorySlug = splitted[0]
 			filename = splitted[1]
 		} else {
-			warn(item, "Ignore files with three levels of depth.")
+			// this should be never reached
 			continue
 		}
 
-		filetype := FILE_TYPE_OTHER
-		if regArticleFile.MatchString(filename) {
-			filetype = FILE_TYPE_ARTICLE
-		} else if filename == CATEGORY_FILE_NAME {
-			filetype = FILE_TYPE_CATEGORY
-		} else {
+		matched := regArticleFile.FindStringSubmatch(filename)
+		if len(matched) != 3 {
+			if regMarkdown.MatchString(filename) {
+				appendWarning(ww, item, "Invalid markdown file")
+			}
 			continue
 		}
 
-		// start reading
-		buf, err := ioutil.ReadFile(filepath.Join(baseDir, item.relative))
+		buf, err := ioutil.ReadFile(filepath.Join(item.baseDir, item.relative))
 		if err != nil {
-			warn(item, fmt.Sprintf("Failed to read: %s", err.Error()))
+			appendWarning(ww, item, fmt.Sprintf("Failed to read file: %s", err.Error()))
 			continue
 		}
 		content := string(buf)
 
-		switch filetype {
-		case FILE_TYPE_ARTICLE:
-			matched := regArticleFile.FindStringSubmatch(filename)
-			if len(matched) != 3 {
-				warn(item, "Invalid markdown file")
-				continue
-			}
-			dateStr := matched[1]
-			slug := matched[2]
-			a := models.NewArticle()
-			a.Title = slug
-			a.Slug = slug
-			a.CategorySlug = categorySlug
-			a.Date = dateStr
+		dateStr := matched[1]
+		slug := matched[2]
+		a := models.NewArticle()
+		a.Title = slug
+		a.Slug = slug
+		a.CategorySlug = categorySlug
+		a.Date = dateStr
 
-			warning := a.LoadFromContent(content)
-			if warning != "" {
-				warn(item, fmt.Sprintf("Invalid header: %s", warning))
-			}
-			err = a.Validate()
-			if err != nil {
-				warn(item, fmt.Sprintf("Validation failed: %s", err.Error()))
-				continue
-			}
-			a.Identify()
-			aa = append(aa, a)
-		case FILE_TYPE_CATEGORY:
-			c := models.NewCategory()
-			c.Slug = categorySlug
-			c.Name = categorySlug
-			err = c.FromJSON(content)
-			if err != nil {
-				warn(item, fmt.Sprintf("Failed to parse: %s", err.Error()))
-			}
-			c.Identify()
-			cc = append(cc, c)
-		default:
-			// ignore
+		warning := a.LoadFromContent(content)
+		if warning != "" {
+			appendWarning(ww, item, fmt.Sprintf("Invalid header: %s", warning))
+		}
+		err = a.Validate()
+		if err != nil {
+			appendWarning(ww, item, fmt.Sprintf("Validation failed: %s", err.Error()))
 			continue
 		}
+		a.Identify()
+		aa = append(aa, a)
 	}
+	return aa
+}
+
+func loadCategories(items []*fileItem, ww map[string][]string) []*models.Category {
+	var regMeta = regexp.MustCompile(`^meta\.json$`)
+	cc := make([]*models.Category, 0)
+
+	const (
+		INVALID = iota
+		NO_MEAT
+		HAS_META
+	)
+
+	for _, item := range items {
+		splitted := strings.SplitN(item.relative, "/", 2)
+		var slug string
+		var filename string
+		if len(splitted) == 1 {
+			slug = "-"
+			filename = splitted[0]
+		} else if len(splitted) == 2 {
+			slug = splitted[0]
+			filename = splitted[1]
+		} else {
+			// this should be never reached
+			continue
+		}
+
+		if !regMeta.MatchString(filename) {
+			continue
+		}
+
+		buf, err := ioutil.ReadFile(filepath.Join(item.baseDir, item.relative))
+		if err != nil {
+			appendWarning(ww, item, fmt.Sprintf("Failed to read file: %s", err.Error()))
+			continue
+		}
+		content := string(buf)
+
+		c := models.NewCategory(slug)
+		c.FromJSON(content)
+		c.Identify()
+		cc = append(cc, c)
+	}
+
+	return cc
+}
+
+func innerReadAllArticles() {
+	ioMutex.Lock()
+	defer ioMutex.Unlock()
+	ww := make(map[string][]string)
+	var baseDir = beego.AppConfig.String("articles_dir")
+	var items = dirwalk(baseDir, ".", 0, 1)
+
+	sort.Slice(items, func(i, j int) bool { return items[i].relative < items[j].relative })
+
+	aa := loadArticles(items, ww)
+	cc := loadCategories(items, ww)
+
 	SetCachedArticles(aa)
 	SetCachedCategorys(cc)
 	SetCachedWarnings(ww)
