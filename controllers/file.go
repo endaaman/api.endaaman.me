@@ -13,6 +13,15 @@ type FileController struct {
 	BaseController
 }
 
+func (c *FileController) Prepare() {
+	c.BaseController.Prepare()
+	if !c.IsAdmin {
+		c.Respond401()
+		c.StopRun()
+		return
+	}
+}
+
 // @Title Get files
 // @Description get files
 // @Success 200 []

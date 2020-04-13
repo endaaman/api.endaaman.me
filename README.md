@@ -20,3 +20,4 @@ $ bee run -downdoc=true -gendoc=true
     - delete
 - authentication
 - file manage
+- static file server(:3002)
