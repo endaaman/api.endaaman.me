@@ -1,13 +1,14 @@
 package controllers
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 	"strings"
+
 	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
-	"github.com/endaaman/api.endaaman.me/services"
 	"github.com/endaaman/api.endaaman.me/models"
+	"github.com/endaaman/api.endaaman.me/services"
 )
 
 type BaseController struct {
@@ -20,8 +21,8 @@ type SimpleResponse struct {
 }
 
 type ValidationFailureResponse struct {
-	Message string `json:"message"`
-	Errors map[string][]string `json:"errors"`
+	Message string              `json:"message"`
+	Errors  map[string][]string `json:"errors"`
 }
 
 const TOKEN_PREFIX = "Bearer"
@@ -77,7 +78,7 @@ func (c *BaseController) Respond400InvalidJSON() {
 func (c *BaseController) Respond400ValidationFailure(err *models.ValidationError) {
 	res := ValidationFailureResponse{
 		Message: "There are some value errors.",
-		Errors: err.Messages,
+		Errors:  err.Messages,
 	}
 	c.Data["json"] = res
 	c.Ctx.ResponseWriter.WriteHeader(400)
@@ -94,25 +95,42 @@ func (c *BaseController) ExpectJSON(data interface{}) bool {
 	return true
 }
 
-func (c *BaseController) Prepare() {
-	rawToken := c.Ctx.Input.Header("Authorization")
-	splitted := strings.SplitN(rawToken, " ", 2)
-	var token string
-	if len(splitted) == 2 && splitted[0] == TOKEN_PREFIX {
-		token = splitted[1]
-		c.IsAdmin = services.ValidateToken(token)
-		if c.IsAdmin {
-			logs.Info("Successfuly logged in.")
-		} else {
-			logs.Warn("Tried to authenticate invalid token.")
-		}
+func (c *BaseController) authorizeToken(token string) {
+	c.IsAdmin = services.ValidateToken(token)
+	if c.IsAdmin {
+		logs.Info("Successfuly logged in.")
 	} else {
-		if beego.BConfig.RunMode == "dev" {
-			_, bypass := c.Ctx.Request.URL.Query()[BYPASS_PARAM]
-			if bypass {
-				c.IsAdmin = true
-				logs.Warn("Bypassed to admin for development")
-			}
+		logs.Warn("Tried to authenticate invalid token.")
+	}
+}
+
+func (c *BaseController) authorize() {
+	// dev and ?x
+	if beego.BConfig.RunMode == "dev" {
+		_, bypass := c.Ctx.Request.URL.Query()[BYPASS_PARAM]
+		if bypass {
+			c.IsAdmin = true
+			logs.Warn("Bypassed to admin for development")
+			return
 		}
 	}
+
+	// auth by 'Authorization' header
+	var token string
+	rawToken := c.Ctx.Input.Header("Authorization")
+	splitted := strings.SplitN(rawToken, " ", 2)
+	if len(splitted) == 2 && splitted[0] == TOKEN_PREFIX {
+		c.authorizeToken(splitted[1])
+		return
+	}
+
+	// auth by 'token' cookie
+	token = c.Ctx.GetCookie("token")
+	if token != "" {
+		c.authorizeToken(token)
+	}
+}
+
+func (c *BaseController) Prepare() {
+	c.authorize()
 }

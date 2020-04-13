@@ -1,10 +1,9 @@
 package models
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
 )
-
 
 type ValidationError struct {
 	Messages map[string][]string
@@ -26,4 +25,3 @@ func (a *Base) Identify() {
 func (a *Base) Identified() bool {
 	return a.identified
 }
-

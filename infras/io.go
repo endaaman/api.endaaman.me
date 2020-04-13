@@ -1,16 +1,17 @@
 package infras
 
 import (
-    "os"
-    "regexp"
-    "sort"
-    "fmt"
-    "strings"
-    "sync"
-    "io/ioutil"
-    "path/filepath"
-    "github.com/astaxie/beego"
-    "github.com/astaxie/beego/logs"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+	"sync"
+
+	"github.com/astaxie/beego"
+	"github.com/astaxie/beego/logs"
 	"github.com/endaaman/api.endaaman.me/models"
 	"github.com/endaaman/api.endaaman.me/utils"
 )
@@ -29,25 +30,31 @@ func WaitIO() {
 	ioWaiter.Wait()
 }
 
-func dirwalk(dir string, depth, limit uint) []string {
+type fileItem struct {
+	baseDir  string
+	relative string
+	file     os.FileInfo
+}
+
+func dirwalk(base, dir string, depth, limit uint) []*fileItem {
 	if depth > limit {
 		return nil
 	}
-	files, err := ioutil.ReadDir(dir)
+	files, err := ioutil.ReadDir(filepath.Join(base, dir))
 	if err != nil {
 		panic(err)
 	}
 
-	var paths []string
+	var items []*fileItem
 	for _, file := range files {
-		path := filepath.Join(dir, file.Name())
+		rel := filepath.Join(dir, file.Name())
+		items = append(items, &fileItem{base, rel, file})
 		if file.IsDir() {
-			paths = append(paths, dirwalk(path, depth + 1, limit)...)
+			items = append(items, dirwalk(base, rel, depth+1, limit)...)
 			continue
 		}
-		paths = append(paths, path)
-    }
-    return paths
+	}
+	return items
 }
 
 func innerReadAllArticles() {
@@ -57,65 +64,53 @@ func innerReadAllArticles() {
 	cc := make([]*models.Category, 0)
 	ww := make(map[string][]string)
 	var baseDir = beego.AppConfig.String("articles_dir")
-	var paths = dirwalk(baseDir, 0, 1)
+	var items = dirwalk(baseDir, ".", 0, 1)
 	var regArticleFile = regexp.MustCompile(`^(\d\d\d\d-\d\d-\d\d)_(\S+)\.md$`)
-	var warn = func(path, message string) {
-		_, ok := ww[path]
+	var warn = func(item *fileItem, message string) {
+		_, ok := ww[item.relative]
 		if ok {
-			ww[path] = append(ww[path], message)
+			ww[item.relative] = append(ww[item.relative], message)
 		} else {
-			ww[path] = []string{message}
+			ww[item.relative] = []string{message}
 		}
-		logs.Warn("[%s] %s", path, message)
+		logs.Warn("[%s] %s", item.relative, message)
 	}
 
-	sort.Slice(paths, func(i, j int) bool { return paths[i] < paths[j] })
-	for _, path := range paths {
-		// compute rel
-		rel, err := filepath.Rel(baseDir, path)
-		if err != nil {
-			warn("common", fmt.Sprintf("Failed compute rel: %s", err.Error()))
-			continue
-		}
-
+	sort.Slice(items, func(i, j int) bool { return items[i].relative < items[j].relative })
+	for _, item := range items {
 		// parse slugs
 		var filename string
 		var categorySlug string
-		splitted := strings.SplitN(rel, "/", 2)
+		splitted := strings.SplitN(item.relative, "/", 2)
 		if len(splitted) == 1 {
 			categorySlug = "-"
 			filename = splitted[0]
 		} else if len(splitted) == 2 {
 			if splitted[0] == "-" {
 				// skip "-/" dir
+				warn(item, "Ignore `-` dir")
 				continue
 			}
 			categorySlug = splitted[0]
 			filename = splitted[1]
 		} else {
-			warn(path, "Invalid path")
+			warn(item, "Ignore files with three levels of depth.")
 			continue
 		}
 
-		// ignore unnecessary
-		ignored := true
 		filetype := FILE_TYPE_OTHER
 		if regArticleFile.MatchString(filename) {
 			filetype = FILE_TYPE_ARTICLE
-			ignored = false
-		}
-		if filename == CATEGORY_FILE_NAME {
+		} else if filename == CATEGORY_FILE_NAME {
 			filetype = FILE_TYPE_CATEGORY
-			ignored = false
-		}
-		if ignored {
+		} else {
 			continue
 		}
 
 		// start reading
-		buf, err := ioutil.ReadFile(path)
+		buf, err := ioutil.ReadFile(filepath.Join(baseDir, item.relative))
 		if err != nil {
-			warn(path, fmt.Sprintf("Failed to read: %s", err.Error()))
+			warn(item, fmt.Sprintf("Failed to read: %s", err.Error()))
 			continue
 		}
 		content := string(buf)
@@ -124,7 +119,7 @@ func innerReadAllArticles() {
 		case FILE_TYPE_ARTICLE:
 			matched := regArticleFile.FindStringSubmatch(filename)
 			if len(matched) != 3 {
-				warn(path, "Invalid markdown file")
+				warn(item, "Invalid markdown file")
 				continue
 			}
 			dateStr := matched[1]
@@ -137,11 +132,11 @@ func innerReadAllArticles() {
 
 			warning := a.LoadFromContent(content)
 			if warning != "" {
-				warn(path, fmt.Sprintf("Invalid header: %s", warning))
+				warn(item, fmt.Sprintf("Invalid header: %s", warning))
 			}
 			err = a.Validate()
 			if err != nil {
-				warn(path, fmt.Sprintf("Validation failed: %s", err.Error()))
+				warn(item, fmt.Sprintf("Validation failed: %s", err.Error()))
 				continue
 			}
 			a.Identify()
@@ -152,7 +147,7 @@ func innerReadAllArticles() {
 			c.Name = categorySlug
 			err = c.FromJSON(content)
 			if err != nil {
-				warn(path, fmt.Sprintf("Failed to parse: %s", err.Error()))
+				warn(item, fmt.Sprintf("Failed to parse: %s", err.Error()))
 			}
 			c.Identify()
 			cc = append(cc, c)
@@ -180,10 +175,10 @@ func innerWriteArticle(a *models.Article) error {
 
 	articleDir := beego.AppConfig.String("articles_dir")
 	baseDir := filepath.Join(articleDir, a.GetBaseDir())
-	err := utils.EnsureDir(baseDir);
-    if err != nil {
+	err := utils.EnsureDir(baseDir)
+	if err != nil {
 		return fmt.Errorf("Failed to mkdir: %s", err.Error())
-    }
+	}
 
 	mdPath := filepath.Join(articleDir, a.GetPath())
 	if utils.FileExists(mdPath) { // file exists
@@ -191,13 +186,13 @@ func innerWriteArticle(a *models.Article) error {
 	}
 
 	content, err := a.ToText()
-    if err != nil {
+	if err != nil {
 		return fmt.Errorf("Failed to serialize article: %s", err.Error())
-    }
+	}
 	err = ioutil.WriteFile(mdPath, []byte(content), 0644)
-    if err != nil {
+	if err != nil {
 		return fmt.Errorf("Failed to write article(%s): %s", mdPath, err.Error())
-    }
+	}
 
 	logs.Info("Succeeded to write article(`%s`)", mdPath)
 	return nil
@@ -206,7 +201,7 @@ func innerWriteArticle(a *models.Article) error {
 func innerRemoveArticle(a *models.Article) error {
 	ioMutex.Lock()
 	defer ioMutex.Unlock()
-	if (!a.Identified()) {
+	if !a.Identified() {
 		return fmt.Errorf("Removing article is not identified.")
 	}
 
@@ -225,10 +220,10 @@ func innerRemoveArticle(a *models.Article) error {
 func innerUpdateArticle(oldA, newA *models.Article) error {
 	ioMutex.Lock()
 	defer ioMutex.Unlock()
-	if (!oldA.Identified()) {
+	if !oldA.Identified() {
 		return fmt.Errorf("Old article is not identified.")
 	}
-	if (newA.Identified()) {
+	if newA.Identified() {
 		return fmt.Errorf("New article is already identified.")
 	}
 
@@ -249,7 +244,7 @@ func innerUpdateArticle(oldA, newA *models.Article) error {
 
 	// if needed to move file
 	fileChanged := oldPath != newPath
-	if (fileChanged) {
+	if fileChanged {
 		if utils.FileExists(newPath) {
 			return fmt.Errorf("Already file exists in: %s", newPath)
 		}
@@ -261,7 +256,7 @@ func innerUpdateArticle(oldA, newA *models.Article) error {
 	}
 
 	// 1. move file if needed
-	if (fileChanged) {
+	if fileChanged {
 		err = os.Rename(oldPath, newPath)
 		if err != nil {
 			return fmt.Errorf(
@@ -271,14 +266,14 @@ func innerUpdateArticle(oldA, newA *models.Article) error {
 	}
 
 	content, err := newA.ToText()
-    if err != nil {
+	if err != nil {
 		return fmt.Errorf("Failed to serialize article: %s", err.Error())
-    }
+	}
 
 	err = ioutil.WriteFile(newPath, []byte(content), 0644)
-    if err != nil {
+	if err != nil {
 		return fmt.Errorf("Failed to write article(%s): %s", newPath, err.Error())
-    }
+	}
 
 	logs.Info("Succeeded to update article(`%s` -> `%s`)", oldPath, newPath)
 	return nil
@@ -287,7 +282,7 @@ func innerUpdateArticle(oldA, newA *models.Article) error {
 func WriteArticle(a *models.Article, ch chan<- error) {
 	ioWaiter.Add(1)
 	go func() {
-		ch<- innerWriteArticle(a)
+		ch <- innerWriteArticle(a)
 		ioWaiter.Done()
 	}()
 }
@@ -303,7 +298,7 @@ func ReadAllArticles() {
 func RemoveArticle(a *models.Article, ch chan<- error) {
 	ioWaiter.Add(1)
 	go func() {
-		ch<- innerRemoveArticle(a)
+		ch <- innerRemoveArticle(a)
 		ioWaiter.Done()
 	}()
 }
@@ -311,7 +306,7 @@ func RemoveArticle(a *models.Article, ch chan<- error) {
 func UpdateArticle(oldA, newA *models.Article, ch chan<- error) {
 	ioWaiter.Add(1)
 	go func() {
-		ch<- innerUpdateArticle(oldA, newA)
+		ch <- innerUpdateArticle(oldA, newA)
 		ioWaiter.Done()
 	}()
 }

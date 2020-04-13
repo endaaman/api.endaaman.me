@@ -1,39 +1,34 @@
 package models
 
 import (
-	// "encoding/json"
-	// "errors"
 	"fmt"
-	"time"
 	"strings"
-	// "regexp"
-	// "strconv"
-	"github.com/goccy/go-yaml"
+	"time"
 
+	"github.com/goccy/go-yaml"
 	"github.com/thedevsaddam/govalidator"
 )
-
 
 const HEADER_DELIMITTER = "---"
 
 type ArticleHeader struct {
-	Title string     `json:"title" yaml:",omitempty"`
-	Tags []string    `json:"tags" yaml:",omitempty"`
-	Aliases []string `json:"aliases" yaml:",omitempty"`
-	Digest string    `json:"digest" yaml:",omitempty"`
-	Image string     `json:"image" yaml:",omitempty"`
-	Private bool     `json:"private" yaml:",omitempty"`
-	Special bool     `json:"special" yaml:",omitempty"`
-	Priority int     `json:"priority" yaml:",omitempty"`
+	Title    string   `json:"title" yaml:",omitempty"`
+	Tags     []string `json:"tags" yaml:",omitempty"`
+	Aliases  []string `json:"aliases" yaml:",omitempty"`
+	Digest   string   `json:"digest" yaml:",omitempty"`
+	Image    string   `json:"image" yaml:",omitempty"`
+	Private  bool     `json:"private" yaml:",omitempty"`
+	Special  bool     `json:"special" yaml:",omitempty"`
+	Priority int      `json:"priority" yaml:",omitempty"`
 }
 
 type Article struct {
 	Base
 	ArticleHeader
 	CategorySlug string `json:"categorySlug"`
-	Slug string         `json:"slug"`
-	Date string         `json:"date"`
-	Body string         `json:"body"`
+	Slug         string `json:"slug"`
+	Date         string `json:"date"`
+	Body         string `json:"body"`
 }
 
 func init() {
@@ -78,14 +73,13 @@ func (a *Article) JointedSlug() string {
 	return a.CategorySlug + "/" + a.Slug
 }
 
-
 func (a *Article) LoadFromContent(content string) string {
 	// var header []string
 	lines := strings.Split(content, "\n")
 	hasHeaderStart := lines[0] == HEADER_DELIMITTER
 	headerEndingLine := -1
 	// header may exist
-	if (hasHeaderStart) {
+	if hasHeaderStart {
 		for i, line := range lines[1:] {
 			if line == HEADER_DELIMITTER {
 				headerEndingLine = i + 1
@@ -109,8 +103,8 @@ func (a *Article) LoadFromContent(content string) string {
 
 func (a *Article) Validate() error {
 	rules := govalidator.MapData{
-		"slug": []string{"required"},
-		"date": []string{"required", "strict_date_str"},
+		"slug":         []string{"required"},
+		"date":         []string{"required", "strict_date_str"},
 		"categorySlug": []string{"required"},
 	}
 

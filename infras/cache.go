@@ -2,6 +2,7 @@ package infras
 
 import (
 	"sync"
+
 	"github.com/endaaman/api.endaaman.me/models"
 )
 
