@@ -39,6 +39,9 @@ func main() {
 		beego.BConfig.WebConfig.StaticDir["/swagger"] = "swagger"
 	}
 
+	beego.DelStaticPath("/static")
+	// beego.SetStaticPath("/static", "shared/")
+
 	beego.InsertFilter("*", beego.BeforeRouter, cors.Allow(&cors.Options{
 		AllowAllOrigins: true,
 		// AllowOrigins:     []string{"https://*.foo.com"},

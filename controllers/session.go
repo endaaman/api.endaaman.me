@@ -21,7 +21,6 @@ type SessionRequest struct {
 	Password string `json:"password"`
 }
 
-
 // @Title Check if authenticated
 // @Success 200 You are me
 // @Success 401 You are not me

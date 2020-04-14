@@ -8,12 +8,15 @@
 package routers
 
 import (
-	"github.com/endaaman/api.endaaman.me/controllers"
 	"github.com/astaxie/beego"
+	"github.com/endaaman/api.endaaman.me/controllers"
 )
 
-func init () {
-	ns := beego.NewNamespace("/v1",
+func init() {
+	beego.ErrorController(&controllers.ErrorController{})
+
+	beego.AddNamespace(beego.NewNamespace("/v1",
+		// beego.NSRouter("/articles", &controllers.ArticleController{}),
 		beego.NSNamespace("/articles",
 			beego.NSInclude(
 				&controllers.ArticleController{},
@@ -39,8 +42,12 @@ func init () {
 				&controllers.MiscController{},
 			),
 		),
-	)
+	))
 
-	beego.ErrorController(&controllers.ErrorController{})
-	beego.AddNamespace(ns)
+	// beego.Router("/static", &controllers.StaticController{})
+	beego.AddNamespace(beego.NewNamespace("/static",
+		beego.NSInclude(
+			&controllers.StaticController{},
+		),
+	))
 }
