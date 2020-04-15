@@ -2,12 +2,13 @@ package infras
 
 import (
 	"log"
-	"time"
 	"sync"
-	"github.com/radovskyb/watcher"
+	"time"
+
+	"github.com/astaxie/beego/logs"
 	"github.com/bep/debounce"
-    "github.com/astaxie/beego"
-    "github.com/astaxie/beego/logs"
+	"github.com/endaaman/api.endaaman.me/config"
+	"github.com/radovskyb/watcher"
 )
 
 var watcher_mutex sync.Mutex
@@ -22,11 +23,11 @@ func notify() {
 
 func AwaitNextChange() {
 	logs.Info("Start awaiting next change and loading done")
-    select {
-    case <-ch:
+	select {
+	case <-ch:
 		logs.Info("Load done by event triggered")
-    case <-time.After(3 * time.Second):
-    }
+	case <-time.After(3 * time.Second):
+	}
 }
 
 func StartWatching() {
@@ -51,8 +52,8 @@ func StartWatching() {
 	}()
 
 	// Watch this folder for changes.
-	dir := beego.AppConfig.String("articles_dir")
-	if err := w.AddRecursive(dir); err != nil {
+	articlesDir := config.GetArticlesDir()
+	if err := w.AddRecursive(articlesDir); err != nil {
 		log.Fatalln(err)
 	}
 

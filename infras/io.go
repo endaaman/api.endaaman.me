@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/astaxie/beego"
 	"github.com/astaxie/beego/logs"
+	"github.com/endaaman/api.endaaman.me/config"
 	"github.com/endaaman/api.endaaman.me/models"
 	"github.com/endaaman/api.endaaman.me/utils"
 )
@@ -62,7 +62,8 @@ func appendWarning(ww map[string][]string, item string, message string) {
 }
 
 func loadArticles(items []string, ww map[string][]string) []*models.Article {
-	baseDir := beego.AppConfig.String("articles_dir")
+	articlesDir := config.GetArticlesDir()
+
 	regMarkdown := regexp.MustCompile(`^\S+\.md$`)
 	regArticleFile := regexp.MustCompile(`^(\d\d\d\d-\d\d-\d\d)_(\S+)\.md$`)
 
@@ -95,7 +96,7 @@ func loadArticles(items []string, ww map[string][]string) []*models.Article {
 			continue
 		}
 
-		buf, err := ioutil.ReadFile(filepath.Join(baseDir, item))
+		buf, err := ioutil.ReadFile(filepath.Join(articlesDir, item))
 		if err != nil {
 			appendWarning(ww, item, fmt.Sprintf("Failed to read file: %s", err.Error()))
 			continue
@@ -126,7 +127,7 @@ func loadArticles(items []string, ww map[string][]string) []*models.Article {
 }
 
 func loadCategories(items []string, ww map[string][]string) []*models.Category {
-	baseDir := beego.AppConfig.String("articles_dir")
+	articlesDir := config.GetArticlesDir()
 	regMeta := regexp.MustCompile(`^meta\.json$`)
 	cc := make([]*models.Category, 0)
 
@@ -155,7 +156,7 @@ func loadCategories(items []string, ww map[string][]string) []*models.Category {
 			continue
 		}
 
-		buf, err := ioutil.ReadFile(filepath.Join(baseDir, item))
+		buf, err := ioutil.ReadFile(filepath.Join(articlesDir, item))
 		if err != nil {
 			appendWarning(ww, item, fmt.Sprintf("Failed to read file: %s", err.Error()))
 			continue
@@ -175,13 +176,17 @@ func innerReadAllArticles() {
 	ioMutex.Lock()
 	defer ioMutex.Unlock()
 	ww := make(map[string][]string)
-	baseDir := beego.AppConfig.String("articles_dir")
-	items := dirwalk(baseDir, ".", 0, 1)
+	articlesDir := config.GetArticlesDir()
+
+	items := dirwalk(articlesDir, ".", 0, 1)
 
 	sort.Slice(items, func(i, j int) bool { return items[i] < items[j] })
 
 	aa := loadArticles(items, ww)
 	cc := loadCategories(items, ww)
+
+	sort.Slice(aa, func(a, b int) bool { return aa[a].Compare(aa[b]) })
+	sort.Slice(cc, func(a, b int) bool { return cc[a].Compare(cc[b]) })
 
 	SetCachedArticles(aa)
 	SetCachedCategorys(cc)
@@ -200,14 +205,14 @@ func innerWriteArticle(a *models.Article) error {
 		return fmt.Errorf("Slug must not be empty: %+v", a)
 	}
 
-	articleDir := beego.AppConfig.String("articles_dir")
-	baseDir := filepath.Join(articleDir, a.GetBaseDir())
+	articlesDir := config.GetArticlesDir()
+	baseDir := filepath.Join(articlesDir, a.GetBaseDir())
 	err := utils.EnsureDir(baseDir)
 	if err != nil {
 		return fmt.Errorf("Failed to mkdir: %s", err.Error())
 	}
 
-	mdPath := filepath.Join(articleDir, a.GetPath())
+	mdPath := filepath.Join(articlesDir, a.GetPath())
 	if utils.FileExists(mdPath) { // file exists
 		return fmt.Errorf("File `%s` does already exit.", a.GetPath())
 	}
@@ -232,7 +237,7 @@ func innerRemoveArticle(a *models.Article) error {
 		return fmt.Errorf("Removing article is not identified.")
 	}
 
-	articlesDir := beego.AppConfig.String("articles_dir")
+	articlesDir := config.GetArticlesDir()
 	path := filepath.Join(articlesDir, a.GetPath())
 
 	err := os.Remove(path)
@@ -254,7 +259,7 @@ func innerUpdateArticle(oldA, newA *models.Article) error {
 		return fmt.Errorf("New article is already identified.")
 	}
 
-	articlesDir := beego.AppConfig.String("articles_dir")
+	articlesDir := config.GetArticlesDir()
 
 	oldPath := filepath.Join(articlesDir, oldA.GetPath())
 	newPath := filepath.Join(articlesDir, newA.GetPath())

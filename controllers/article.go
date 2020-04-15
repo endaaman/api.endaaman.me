@@ -10,7 +10,6 @@ import (
 	"github.com/endaaman/api.endaaman.me/services"
 )
 
-
 type ArticleController struct {
 	BaseController
 }
@@ -19,7 +18,7 @@ type ArticleController struct {
 // @Success 200 {object} models.Article
 // @router / [get]
 func (c *ArticleController) GetAll() {
-	c.Data["json"] = services.GetArticles()
+	c.Data["json"] = services.GetArticles(c.IsAdmin)
 	c.ServeJSON()
 }
 
@@ -102,7 +101,6 @@ func (c *ArticleController) Update() {
 	c.Data["json"] = services.IdentifyArticle(newA)
 	c.ServeJSON()
 }
-
 
 // @Title Remove the article
 // @Success 200 Success

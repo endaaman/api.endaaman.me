@@ -1,17 +1,19 @@
 package infras
 
 import (
-    "os"
-    "io"
-    "fmt"
+	"fmt"
+	"io"
 	"mime/multipart"
-    // "regexp"
-    // "strings"
-    "sync"
-    "io/ioutil"
-    "path/filepath"
-    "github.com/astaxie/beego"
-    // "github.com/astaxie/beego/logs"
+	"os"
+
+	// "regexp"
+	// "strings"
+	"io/ioutil"
+	"path/filepath"
+	"sync"
+
+	// "github.com/astaxie/beego/logs"
+	"github.com/endaaman/api.endaaman.me/config"
 	"github.com/endaaman/api.endaaman.me/models"
 )
 
@@ -22,7 +24,7 @@ func ListDir(rel string) []*models.File {
 	go func() {
 		fileMutex.Lock()
 		defer fileMutex.Unlock()
-		target := filepath.Join(beego.AppConfig.String("private_dir"), rel)
+		target := filepath.Join(config.GetSharedDir(), rel)
 
 		ii, err := ioutil.ReadDir(target)
 		if err != nil {
@@ -34,7 +36,7 @@ func ListDir(rel string) []*models.File {
 			file := models.NewFile(i.Name(), i.Size(), i.ModTime(), i.IsDir())
 			files = append(files, file)
 		}
-		ch<- files
+		ch <- files
 	}()
 	return <-ch
 }
@@ -44,13 +46,13 @@ func getStat(rel string) os.FileInfo {
 	go func() {
 		fileMutex.Lock()
 		defer fileMutex.Unlock()
-		target := filepath.Join(beego.AppConfig.String("private_dir"), rel)
+		target := filepath.Join(config.GetSharedDir(), rel)
 		stat, err := os.Stat(target)
 		if err != nil {
-			ch<- nil
+			ch <- nil
 			return
 		}
-		ch<- stat
+		ch <- stat
 	}()
 	return <-ch
 }
@@ -65,19 +67,18 @@ func Exists(rel string) bool {
 	return stat != nil
 }
 
-
 func DeleteFile(rel string) error {
 	ch := make(chan error)
 	go func() {
 		fileMutex.Lock()
 		defer fileMutex.Unlock()
-		target := filepath.Join(beego.AppConfig.String("private_dir"), rel)
+		target := filepath.Join(config.GetSharedDir(), rel)
 		err := os.Remove(target)
 		if err != nil {
-			ch<- fmt.Errorf("Could not remove item: %s", err.Error())
+			ch <- fmt.Errorf("Could not remove item: %s", err.Error())
 			return
 		}
-		ch<- nil
+		ch <- nil
 	}()
 	return <-ch
 }
@@ -87,19 +88,19 @@ func SaveToFile(rel string, file multipart.File) error {
 	go func() {
 		fileMutex.Lock()
 		defer fileMutex.Unlock()
-		target := filepath.Join(beego.AppConfig.String("private_dir"), rel)
+		target := filepath.Join(config.GetSharedDir(), rel)
 		dst, err := os.Create(target)
 		defer dst.Close()
 		if err != nil {
-			ch<- err
+			ch <- err
 			return
 		}
 		_, err = io.Copy(dst, file)
 		if err != nil {
-			ch<- err
+			ch <- err
 			return
 		}
-		ch<- nil
+		ch <- nil
 	}()
 	return <-ch
 }

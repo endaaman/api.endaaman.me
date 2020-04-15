@@ -73,6 +73,21 @@ func (a *Article) JointedSlug() string {
 	return a.CategorySlug + "/" + a.Slug
 }
 
+func (a *Article) Compare(b *Article) bool {
+	// larger date goes first
+	dateDiff := strings.Compare(a.Date, b.Date)
+	if dateDiff != 0 {
+		return dateDiff > 0
+	}
+	// larger priority goes first
+	priDiff := a.Priority - b.Priority
+	if priDiff != 0 {
+		return priDiff > 0
+	}
+	// smaller slug goes first
+	return strings.Compare(b.Slug, a.Slug) > 0
+}
+
 func (a *Article) LoadFromContent(content string) string {
 	// var header []string
 	lines := strings.Split(content, "\n")
@@ -130,10 +145,10 @@ func (a *Article) ToText() (string, error) {
 	}
 	headerText := string(buf)
 
-	content := a.Body
-	if headerText != "{}\n" {
-		template := "---\n%s---\n%s"
-		content = fmt.Sprintf(template, headerText, a.Body)
+	if headerText == "{}\n" {
+		return a.Body, nil
 	}
-	return content, nil
+
+	template := "---\n%s---\n%s"
+	return fmt.Sprintf(template, headerText, a.Body), nil
 }

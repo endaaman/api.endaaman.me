@@ -1,10 +1,6 @@
 package controllers
 
 import (
-	// "fmt"
-	// "encoding/json"
-	// "net/url"
-	"github.com/astaxie/beego"
 	"github.com/endaaman/api.endaaman.me/services"
 )
 
@@ -49,7 +45,7 @@ func (c *SessionController) Login() {
 		return
 	}
 
-	suc := services.ValidatePassword(beego.AppConfig.String("password_hash"), req.Password)
+	suc := services.ValidatePassword(req.Password)
 	if !suc {
 		c.Respond401()
 		return

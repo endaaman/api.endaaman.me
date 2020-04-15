@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type CategoryMeta struct {
@@ -28,4 +29,14 @@ func (c *Category) FromJSON(jsonStr string) error {
 		return fmt.Errorf("Failed to unmarshal json: %s", err.Error())
 	}
 	return nil
+}
+
+func (a *Category) Compare(b *Category) bool {
+	// larger priority goes first
+	priDiff := b.Priority - a.Priority
+	if priDiff != 0 {
+		return priDiff > 0
+	}
+	// smaller slug goes first
+	return strings.Compare(a.Slug, b.Slug) > 0
 }

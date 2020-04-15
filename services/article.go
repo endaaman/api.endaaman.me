@@ -2,8 +2,9 @@ package services
 
 import (
 	"fmt"
-	"github.com/endaaman/api.endaaman.me/models"
+
 	"github.com/endaaman/api.endaaman.me/infras"
+	"github.com/endaaman/api.endaaman.me/models"
 )
 
 func searchArticle(aa []*models.Article, categorySlug, slug string) *models.Article {
@@ -20,9 +21,19 @@ func ReadAllArticles() {
 	infras.WaitIO()
 }
 
-func GetArticles() []*models.Article {
+func GetArticles(includePrivate bool) []*models.Article {
 	infras.WaitIO()
-    return infras.GetCachedArticles()
+	cached := infras.GetCachedArticles()
+	if includePrivate {
+		return cached
+	}
+	aa := make([]*models.Article, 0)
+	for _, a := range cached {
+		if !a.Private {
+			aa = append(aa, a)
+		}
+	}
+	return aa
 }
 
 func FindArticle(categorySlug, slug string) *models.Article {
