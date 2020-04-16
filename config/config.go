@@ -48,5 +48,5 @@ func GetPrivateDir() string {
 }
 
 func IsDev() bool {
-	return beego.BConfig.RunMode == "dev"
+	return beego.BConfig.RunMode == beego.DEV
 }

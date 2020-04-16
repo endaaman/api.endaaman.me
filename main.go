@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/astaxie/beego"
+	"github.com/astaxie/beego/logs"
 	"github.com/astaxie/beego/plugins/cors"
 	"github.com/endaaman/api.endaaman.me/config"
 	"github.com/endaaman/api.endaaman.me/infras"
@@ -15,6 +16,7 @@ import (
 //go:generate sh -c "rm routers/0.go routers/z.go"
 
 func main() {
+	logs.Info("Starting Mode: `%s`", beego.BConfig.RunMode)
 	infras.PrepareDirs()
 	services.ReadAllArticles()
 	go infras.StartWatching()
