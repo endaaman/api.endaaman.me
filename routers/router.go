@@ -16,7 +16,6 @@ func init() {
 	beego.ErrorController(&controllers.ErrorController{})
 
 	beego.AddNamespace(beego.NewNamespace("/v1",
-		// beego.NSRouter("/articles", &controllers.ArticleController{}),
 		beego.NSNamespace("/articles",
 			beego.NSInclude(
 				&controllers.ArticleController{},
@@ -44,7 +43,6 @@ func init() {
 		),
 	))
 
-	// beego.Router("/static", &controllers.StaticController{})
 	beego.AddNamespace(beego.NewNamespace("/static",
 		beego.NSInclude(
 			&controllers.StaticController{},
