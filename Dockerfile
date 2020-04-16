@@ -10,7 +10,7 @@ RUN \
   echo "\ndaemon off;" >> /etc/nginx/nginx.conf && \
   rm /etc/nginx/sites-enabled/default
 
-COPY nginx/nginx.conf /etc/nginx/sites-enabled/
+COPY nginx/api.conf /etc/nginx/sites-enabled/
 COPY supervisor.conf /etc/supervisor/conf.d/
 
 # app
@@ -18,6 +18,7 @@ RUN mkdir -p /var/www/app
 ENV GOPATH /var/www/
 ENV PATH $PATH:$GOPATH/bin
 
+# RUN go get github.com/beego/bee
 WORKDIR /var/www/app
 COPY go.mod .
 COPY go.sum .
