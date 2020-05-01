@@ -1,7 +1,7 @@
 package utils
 
 import (
-    "os"
+	"os"
 )
 
 func FileExists(path string) bool {
@@ -15,4 +15,3 @@ func FileExists(path string) bool {
 func EnsureDir(dir string) error {
 	return os.MkdirAll(dir, 0777)
 }
-

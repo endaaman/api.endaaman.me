@@ -13,8 +13,10 @@ import (
 	"sync"
 
 	// "github.com/astaxie/beego/logs"
+	"github.com/astaxie/beego/logs"
 	"github.com/endaaman/api.endaaman.me/config"
 	"github.com/endaaman/api.endaaman.me/models"
+	"github.com/endaaman/api.endaaman.me/utils"
 )
 
 var fileMutex = new(sync.Mutex)
@@ -41,7 +43,7 @@ func ListDir(rel string) []*models.File {
 	return <-ch
 }
 
-func getStat(rel string) os.FileInfo {
+func GetStat(rel string) os.FileInfo {
 	ch := make(chan os.FileInfo)
 	go func() {
 		fileMutex.Lock()
@@ -55,16 +57,6 @@ func getStat(rel string) os.FileInfo {
 		ch <- stat
 	}()
 	return <-ch
-}
-
-func IsDir(rel string) bool {
-	stat := getStat(rel)
-	return stat != nil && stat.IsDir()
-}
-
-func Exists(rel string) bool {
-	stat := getStat(rel)
-	return stat != nil
 }
 
 func DeleteFile(rel string) error {
@@ -100,6 +92,29 @@ func SaveToFile(rel string, file multipart.File) error {
 			ch <- err
 			return
 		}
+		ch <- nil
+	}()
+	return <-ch
+}
+
+func RenameFile(src, dest string) error {
+	ch := make(chan error)
+	go func() {
+		fileMutex.Lock()
+		defer fileMutex.Unlock()
+		srcPath := filepath.Join(config.GetSharedDir(), src)
+		destPath := filepath.Join(config.GetSharedDir(), dest)
+		if !utils.FileExists(srcPath) {
+			ch <- fmt.Errorf("File does not exist in path `%s`", srcPath)
+			return
+		}
+		if utils.FileExists(destPath) {
+			ch <- fmt.Errorf("File already exists in path `%s`", destPath)
+			return
+		}
+		// check if not deeper than root
+		// check if dest base dir exists
+		logs.Warn("RENAME %s -> %s", srcPath, destPath)
 		ch <- nil
 	}()
 	return <-ch

@@ -83,7 +83,7 @@ func (c *FileController) Upload() {
 		if !m[name] {
 			m[name] = true
 		}
-		if services.Exists(name) {
+		if services.FileExists(name) {
 			err = fmt.Errorf("The file(%s) already exists.", name)
 			break
 		}
@@ -114,12 +114,28 @@ func (c *FileController) Upload() {
 	c.RespondSimple("success")
 }
 
+type FileMoveRequest struct {
+	Dest string `json:"dest"`
+}
+
 // @Title Delete file
 // @Description delte file
 // @Param	oldName	body 		true	"old name"
 // @Param	newName	body 		true	"new name"
 // @Success 200
-// @router /rename [patch]
+// @router /* [patch]
 func (c *FileController) Rename() {
-	println("RENAME")
+	req := FileMoveRequest{}
+	if !c.ExpectJSON(&req) {
+		c.Respond400InvalidJSON()
+		return
+	}
+
+	rel := c.Ctx.Input.Param(":splat")
+	err := services.MoveFile(rel, req.Dest)
+	if err != nil {
+		c.Respond400e(err)
+		return
+	}
+	c.Ctx.ResponseWriter.WriteHeader(204)
 }

@@ -55,5 +55,8 @@ func (c *StaticController) Get() {
 		return
 	}
 	rp := httputil.NewSingleHostReverseProxy(u)
-	rp.ServeHTTP(c.Ctx.ResponseWriter, c.Ctx.Request)
+	req := c.Ctx.Request.Clone(c.Ctx.Request.Context())
+	// modify path: HOST/static/hoge/fuga -> HOST/hoge/fuga
+	req.URL.Path = "/" + rel
+	rp.ServeHTTP(c.Ctx.ResponseWriter, req)
 }
