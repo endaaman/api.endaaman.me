@@ -13,8 +13,8 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const PASSWORD_HASH_FILE = "password_hash"
-const SECRET_KEY_BASE_FILE = "secret_key_base"
+const PASSWORD_HASH_FILE = "hash.txt"
+const SECRET_KEY_BASE_FILE = "secret.txt"
 
 func init() {
 	_ = getSecretKey()
