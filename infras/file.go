@@ -5,6 +5,7 @@ import (
 	"io"
 	"mime/multipart"
 	"os"
+	"strings"
 
 	// "regexp"
 	// "strings"
@@ -13,7 +14,7 @@ import (
 	"sync"
 
 	// "github.com/astaxie/beego/logs"
-	"github.com/astaxie/beego/logs"
+
 	"github.com/endaaman/api.endaaman.me/config"
 	"github.com/endaaman/api.endaaman.me/models"
 	"github.com/endaaman/api.endaaman.me/utils"
@@ -75,7 +76,7 @@ func DeleteFile(rel string) error {
 	return <-ch
 }
 
-func SaveToFile(rel string, file multipart.File) error {
+func SaveToFile(file multipart.File, rel string) error {
 	ch := make(chan error)
 	go func() {
 		fileMutex.Lock()
@@ -97,13 +98,45 @@ func SaveToFile(rel string, file multipart.File) error {
 	return <-ch
 }
 
+func Mkdir(rel string) error {
+	ch := make(chan error)
+	go func() {
+		fileMutex.Lock()
+		defer fileMutex.Unlock()
+		target := filepath.Join(config.GetSharedDir(), rel)
+		stat, err := os.Stat(target)
+		if err == nil {
+			var w string
+			if stat.IsDir() {
+				w = "directory"
+			} else {
+				w = "file"
+			}
+			ch <- fmt.Errorf("A %s already exists in %s", w, rel)
+			return
+		}
+		err = utils.EnsureDir(target)
+		if err != nil {
+			ch <- fmt.Errorf("Failed to maked directory %s: %s", rel, err.Error())
+			return
+		}
+		ch <- nil
+	}()
+	return <-ch
+}
+
 func RenameFile(src, dest string) error {
 	ch := make(chan error)
 	go func() {
 		fileMutex.Lock()
 		defer fileMutex.Unlock()
-		srcPath := filepath.Join(config.GetSharedDir(), src)
-		destPath := filepath.Join(config.GetSharedDir(), dest)
+		sharedDir, err := filepath.Abs(config.GetSharedDir())
+		if err != nil {
+			ch <- err
+			return
+		}
+		srcPath := filepath.Join(sharedDir, src)
+		destPath := filepath.Join(sharedDir, dest)
 		if !utils.FileExists(srcPath) {
 			ch <- fmt.Errorf("File does not exist in path `%s`", srcPath)
 			return
@@ -112,9 +145,32 @@ func RenameFile(src, dest string) error {
 			ch <- fmt.Errorf("File already exists in path `%s`", destPath)
 			return
 		}
-		// check if not deeper than root
-		// check if dest base dir exists
-		logs.Warn("RENAME %s -> %s", srcPath, destPath)
+
+		destBase, err := filepath.Abs(filepath.Dir(destPath))
+		if err != nil {
+			ch <- err
+			return
+		}
+		stat, err := os.Stat(destBase)
+		if !(err == nil && stat.IsDir()) {
+			ch <- fmt.Errorf("Dest dir(%s) is not exists", destBase)
+			return
+		}
+
+		fmt.Println(sharedDir)
+		fmt.Println(destBase)
+
+		under := strings.HasPrefix(destBase, sharedDir)
+		if !under {
+			ch <- fmt.Errorf("Tried to save file under shared dir.")
+			return
+		}
+
+		err = os.Rename(srcPath, destPath)
+		if err != nil {
+			ch <- fmt.Errorf("Failed to rename: %s -> %s", srcPath, destPath)
+			return
+		}
 		ch <- nil
 	}()
 	return <-ch

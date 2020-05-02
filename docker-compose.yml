@@ -1,4 +1,5 @@
 endaaman-backend:
+  container_name: endaaman-backend-dev
   build: .
   environment:
     - VIRTUAL_HOST=api.endaaman.test,static.endaaman.test

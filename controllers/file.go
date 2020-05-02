@@ -1,11 +1,12 @@
 package controllers
 
 import (
-	"fmt"
 	// "mime/multipart"
 	// "strings"
 	// "encoding/json"
 	// "github.com/astaxie/beego/logs"
+	"fmt"
+
 	"github.com/endaaman/api.endaaman.me/services"
 )
 
@@ -68,48 +69,26 @@ func (c *FileController) Upload() {
 		c.Respond400f("Uploaded files should be under name `files`: %s", err.Error())
 		return
 	}
-	if len(headers) == 0 {
-		c.Respond400("Uploaded file is empty")
-		return
-	}
 
-	m := make(map[string]bool)
-	for _, header := range headers {
-		name := header.Filename
-		if m[name] {
-			err = fmt.Errorf("Duplicated files(%s) are uploaded", name)
-			break
-		}
-		if !m[name] {
-			m[name] = true
-		}
-		if services.FileExists(name) {
-			err = fmt.Errorf("The file(%s) already exists.", name)
-			break
-		}
-	}
-
+	err = services.SaveFiles(rel, headers)
 	if err != nil {
-		c.Respond400e(err)
+		c.Respond400f("Failed to save files: %s", err.Error())
 		return
 	}
+	c.RespondSimple("success")
+}
 
-	if len(headers) < 1 {
-		c.Respond400("No files uploaded")
+// @Title Mkdir
+// @Description delte file
+// @Param	files	formData 	true		files
+// @Success 200
+// @router /* [put]
+func (c *FileController) Mkdir() {
+	rel := c.Ctx.Input.Param(":splat")
+	err := services.Mkdir(rel)
+	if err != nil {
+		c.Respond400f("Failed to make dir `%s`: %s", rel, err.Error())
 		return
-	}
-
-	for _, header := range headers {
-		file, err := header.Open()
-		if err != nil {
-			c.Respond400f("Failed to open file `%s`:  %v", header.Filename, err)
-			return
-		}
-		err = services.SaveToFile(header.Filename, file)
-		if err != nil {
-			c.Respond400f("Failed to save file `%s`:  %v", header.Filename, err)
-			return
-		}
 	}
 	c.RespondSimple("success")
 }
