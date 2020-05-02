@@ -1,6 +1,7 @@
 package infras
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -16,12 +17,22 @@ import (
 	"github.com/endaaman/api.endaaman.me/utils"
 )
 
-const CATEGORY_FILE_NAME = "meta.json"
+const META_FILE_NAME = "meta.json"
 const (
 	FILE_TYPE_ARTICLE = iota
 	FILE_TYPE_CATEGORY
 	FILE_TYPE_OTHER
 )
+
+type CategoryMetaEntry struct {
+	Name     string `json:"name"`
+	Priority int    `json:"priority"`
+}
+
+type FileItem struct {
+	rel  string
+	file os.FileInfo
+}
 
 var ioWaiter = new(sync.WaitGroup)
 var ioMutex = new(sync.Mutex)
@@ -30,7 +41,7 @@ func WaitIO() {
 	ioWaiter.Wait()
 }
 
-func dirwalk(base, dir string, depth, limit uint) []string {
+func dirwalk(base, dir string, depth, limit uint) []*FileItem {
 	if depth > limit {
 		return nil
 	}
@@ -39,14 +50,17 @@ func dirwalk(base, dir string, depth, limit uint) []string {
 		panic(err)
 	}
 
-	var items []string
+	var items []*FileItem
 	for _, file := range files {
 		rel := filepath.Join(dir, file.Name())
 		if file.IsDir() {
 			items = append(items, dirwalk(base, rel, depth+1, limit)...)
-			continue
 		}
-		items = append(items, rel)
+		item := FileItem{
+			rel:  rel,
+			file: file,
+		}
+		items = append(items, &item)
 	}
 	return items
 }
@@ -61,9 +75,8 @@ func appendWarning(ww map[string][]string, item string, message string) {
 	logs.Warn("[%s] %s", item, message)
 }
 
-func loadArticles(items []string, ww map[string][]string) []*models.Article {
+func loadArticles(items []*FileItem, ww map[string][]string) []*models.Article {
 	articlesDir := config.GetArticlesDir()
-
 	regMarkdown := regexp.MustCompile(`^\S+\.md$`)
 	regArticleFile := regexp.MustCompile(`^(\d\d\d\d-\d\d-\d\d)_(\S+)\.md$`)
 
@@ -71,7 +84,7 @@ func loadArticles(items []string, ww map[string][]string) []*models.Article {
 	for _, item := range items {
 		var filename string
 		var categorySlug string
-		splitted := strings.SplitN(item, "/", 2)
+		splitted := strings.SplitN(item.rel, "/", 2)
 		if len(splitted) == 1 {
 			categorySlug = "-"
 			filename = splitted[0]
@@ -91,14 +104,14 @@ func loadArticles(items []string, ww map[string][]string) []*models.Article {
 		matched := regArticleFile.FindStringSubmatch(filename)
 		if len(matched) != 3 {
 			if regMarkdown.MatchString(filename) {
-				appendWarning(ww, item, "Invalid markdown file")
+				appendWarning(ww, item.rel, "Invalid markdown file")
 			}
 			continue
 		}
 
-		buf, err := ioutil.ReadFile(filepath.Join(articlesDir, item))
+		buf, err := ioutil.ReadFile(filepath.Join(articlesDir, item.rel))
 		if err != nil {
-			appendWarning(ww, item, fmt.Sprintf("Failed to read file: %s", err.Error()))
+			appendWarning(ww, item.rel, fmt.Sprintf("Failed to read file: %s", err.Error()))
 			continue
 		}
 		content := string(buf)
@@ -113,11 +126,11 @@ func loadArticles(items []string, ww map[string][]string) []*models.Article {
 
 		warning := a.LoadFromContent(content)
 		if warning != "" {
-			appendWarning(ww, item, fmt.Sprintf("Invalid header: %s", warning))
+			appendWarning(ww, item.rel, fmt.Sprintf("Invalid header: %s", warning))
 		}
 		err = a.Validate()
 		if err != nil {
-			appendWarning(ww, item, fmt.Sprintf("Validation failed: %s", err.Error()))
+			appendWarning(ww, item.rel, fmt.Sprintf("Validation failed: %s", err.Error()))
 			continue
 		}
 		a.Identify()
@@ -126,45 +139,39 @@ func loadArticles(items []string, ww map[string][]string) []*models.Article {
 	return aa
 }
 
-func loadCategories(items []string, ww map[string][]string) []*models.Category {
+func loadCategories(items []*FileItem, ww map[string][]string) []*models.Category {
 	articlesDir := config.GetArticlesDir()
-	regMeta := regexp.MustCompile(`^meta\.json$`)
+	metaPath := filepath.Join(articlesDir, META_FILE_NAME)
 	cc := make([]*models.Category, 0)
+	meta := make(map[string]CategoryMetaEntry, 0)
 
-	const (
-		INVALID = iota
-		NO_MEAT
-		HAS_META
-	)
-
-	for _, item := range items {
-		splitted := strings.SplitN(item, "/", 2)
-		var slug string
-		var filename string
-		if len(splitted) == 1 {
-			slug = "-"
-			filename = splitted[0]
-		} else if len(splitted) == 2 {
-			slug = splitted[0]
-			filename = splitted[1]
-		} else {
-			// this should be never reached
-			continue
-		}
-
-		if !regMeta.MatchString(filename) {
-			continue
-		}
-
-		buf, err := ioutil.ReadFile(filepath.Join(articlesDir, item))
+	if utils.FileExists(metaPath) {
+		buf, err := ioutil.ReadFile(metaPath)
 		if err != nil {
-			appendWarning(ww, item, fmt.Sprintf("Failed to read file: %s", err.Error()))
+			appendWarning(ww, META_FILE_NAME, fmt.Sprintf("Failed to read: %s", err.Error()))
+		}
+		err = json.Unmarshal(buf, &meta)
+		if err != nil {
+			appendWarning(ww, META_FILE_NAME, fmt.Sprintf("Invalid json: %s", err.Error()))
+		}
+	}
+
+	slugs := make([]string, 1)
+	slugs[0] = "-" // default category
+	for _, item := range items {
+		if !item.file.IsDir() {
 			continue
 		}
-		content := string(buf)
+		slugs = append(slugs, item.rel)
+	}
 
+	for _, slug := range slugs {
 		c := models.NewCategory(slug)
-		c.FromJSON(content)
+		entry, ok := meta[slug]
+		if ok {
+			c.Name = entry.Name
+			c.Priority = entry.Priority
+		}
 		c.Identify()
 		cc = append(cc, c)
 	}
@@ -176,11 +183,10 @@ func innerReadAllArticles() {
 	ioMutex.Lock()
 	defer ioMutex.Unlock()
 	ww := make(map[string][]string)
+
 	articlesDir := config.GetArticlesDir()
-
 	items := dirwalk(articlesDir, ".", 0, 1)
-
-	sort.Slice(items, func(i, j int) bool { return items[i] < items[j] })
+	sort.Slice(items, func(i, j int) bool { return items[i].rel < items[j].rel })
 
 	aa := loadArticles(items, ww)
 	cc := loadCategories(items, ww)

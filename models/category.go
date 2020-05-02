@@ -1,34 +1,22 @@
 package models
 
 import (
-	"encoding/json"
-	"fmt"
 	"strings"
 )
 
-type CategoryMeta struct {
-	Name     string `json:"name"`
-	Priority int    `json:"priority"`
-}
-
 type Category struct {
 	Base
-	CategoryMeta
-	Slug string `json:"slug"`
+	Slug     string `json:"slug"`
+	Name     string `json:"name"`
+	Priority int    `json:"priority"`
 }
 
 func NewCategory(slug string) *Category {
 	c := Category{}
 	c.Slug = slug
+	c.Name = slug
+	c.Priority = 0
 	return &c
-}
-
-func (c *Category) FromJSON(jsonStr string) error {
-	err := json.Unmarshal([]byte(jsonStr), &c.CategoryMeta)
-	if err != nil {
-		return fmt.Errorf("Failed to unmarshal json: %s", err.Error())
-	}
-	return nil
 }
 
 func (a *Category) Compare(b *Category) bool {

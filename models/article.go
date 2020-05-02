@@ -103,6 +103,7 @@ func (a *Article) LoadFromContent(content string) string {
 	}
 	// not (starting and ending)
 	if !(hasHeaderStart && headerEndingLine > 0) {
+		a.Body = content
 		return ""
 	}
 	body := strings.Join(lines[headerEndingLine+1:len(lines)], "\n")
@@ -150,5 +151,8 @@ func (a *Article) ToText() (string, error) {
 	}
 
 	template := "---\n%s---\n%s"
-	return fmt.Sprintf(template, headerText, a.Body), nil
+	content := fmt.Sprintf(template, headerText, a.Body)
+	println(content)
+	return content, nil
+
 }

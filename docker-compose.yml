@@ -1,0 +1,6 @@
+endaaman-backend:
+  build: .
+  environment:
+    - VIRTUAL_HOST=api.endaaman.test,static.endaaman.test
+  volumes:
+    - endaaman-data:/var/www/shared
