@@ -152,7 +152,5 @@ func (a *Article) ToText() (string, error) {
 
 	template := "---\n%s---\n%s"
 	content := fmt.Sprintf(template, headerText, a.Body)
-	println(content)
 	return content, nil
-
 }

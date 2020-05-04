@@ -4,7 +4,6 @@ import (
 	// "fmt"
 	// "net/url"
 	// "github.com/astaxie/beego"
-	// "github.com/astaxie/beego/logs"
 
 	"github.com/endaaman/api.endaaman.me/models"
 	"github.com/endaaman/api.endaaman.me/services"

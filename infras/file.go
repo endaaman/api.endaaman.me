@@ -157,9 +157,6 @@ func RenameFile(src, dest string) error {
 			return
 		}
 
-		fmt.Println(sharedDir)
-		fmt.Println(destBase)
-
 		under := strings.HasPrefix(destBase, sharedDir)
 		if !under {
 			ch <- fmt.Errorf("Tried to save file under shared dir.")

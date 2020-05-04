@@ -72,6 +72,7 @@ func RemoveArticle(a *models.Article) error {
 }
 
 func IdentifyArticle(a *models.Article) *models.Article {
+	infras.WaitIO()
 	aa := infras.GetCachedArticles()
 	return searchArticle(aa, a.CategorySlug, a.Slug)
 }
