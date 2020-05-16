@@ -17,6 +17,8 @@ import (
 	"github.com/endaaman/api.endaaman.me/utils"
 )
 
+const WARNING_KEY_ROOT = "_ROOT"
+
 const META_FILE_NAME = "meta.json"
 const (
 	FILE_TYPE_ARTICLE = iota
@@ -182,17 +184,24 @@ func loadCategories(items []*FileItem, ww map[string][]string) []*models.Categor
 func innerReadAllArticles() {
 	ioMutex.Lock()
 	defer ioMutex.Unlock()
+
+	aa := make([]*models.Article, 0)
+	cc := make([]*models.Category, 0)
 	ww := make(map[string][]string)
 
 	articlesDir := config.GetArticlesDir()
-	items := dirwalk(articlesDir, ".", 0, 1)
-	sort.Slice(items, func(i, j int) bool { return items[i].rel < items[j].rel })
+	if utils.IsDir(articlesDir) {
+		items := dirwalk(articlesDir, ".", 0, 1)
+		sort.Slice(items, func(i, j int) bool { return items[i].rel < items[j].rel })
 
-	aa := loadArticles(items, ww)
-	cc := loadCategories(items, ww)
+		aa = loadArticles(items, ww)
+		cc = loadCategories(items, ww)
 
-	sort.Slice(aa, func(a, b int) bool { return aa[a].Compare(aa[b]) })
-	sort.Slice(cc, func(a, b int) bool { return cc[a].Compare(cc[b]) })
+		sort.Slice(aa, func(a, b int) bool { return aa[a].Compare(aa[b]) })
+		sort.Slice(cc, func(a, b int) bool { return cc[a].Compare(cc[b]) })
+	} else {
+		appendWarning(ww, WARNING_KEY_ROOT, fmt.Sprintf("Articles Dir(%s) does not exists", articlesDir))
+	}
 
 	SetCachedArticles(aa)
 	SetCachedCategorys(cc)

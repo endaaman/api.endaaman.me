@@ -58,7 +58,11 @@ func (c *FileController) Delete() {
 // @router /* [post]
 func (c *FileController) Upload() {
 	rel := c.Ctx.Input.Param(":splat")
-	isDir := services.IsDir(rel)
+	isDir, err := services.IsDir(rel)
+	if err != nil {
+		c.Respond400e(err)
+		return
+	}
 	if !isDir {
 		c.Respond400(fmt.Sprintf("Target dir `%s` is not directory", rel))
 		return

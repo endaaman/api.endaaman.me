@@ -10,21 +10,16 @@ import (
 	"github.com/endaaman/api.endaaman.me/models"
 )
 
-func FileExists(rel string) bool {
-	stat := infras.GetStat(rel)
-	return stat != nil
+func FileExists(rel string) (bool, error) {
+	return infras.FileExists(rel)
 }
 
-func IsDir(rel string) bool {
-	stat := infras.GetStat(rel)
-	return stat != nil && stat.IsDir()
+func IsDir(rel string) (bool, error) {
+	return infras.IsDir(rel)
 }
 
 func ListDir(rel string) ([]*models.File, error) {
-	if !IsDir(rel) {
-		return nil, fmt.Errorf("Can not read the path: `%s`", rel)
-	}
-	return infras.ListDir(rel), nil
+	return infras.ListDir(rel)
 }
 
 func DeleteFile(rel string) error {
@@ -46,7 +41,11 @@ func SaveFiles(rel string, headers []*multipart.FileHeader) error {
 			m[name] = true
 		}
 		target := filepath.Join(rel, header.Filename)
-		if FileExists(target) {
+		exists, err := FileExists(target)
+		if err != nil {
+			return err
+		}
+		if exists {
 			return fmt.Errorf("The file(%s) already exists.", target)
 		}
 	}

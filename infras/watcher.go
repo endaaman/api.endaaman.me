@@ -1,17 +1,20 @@
 package infras
 
 import (
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/astaxie/beego/logs"
 	"github.com/bep/debounce"
 	"github.com/endaaman/api.endaaman.me/config"
+	"github.com/endaaman/api.endaaman.me/utils"
 	"github.com/radovskyb/watcher"
 )
 
-var watcher_mutex sync.Mutex
+var LastError error = nil
+var IsWatcherActive bool = false
+var mutex sync.Mutex
 var ch = make(chan bool)
 
 func notify() {
@@ -30,38 +33,61 @@ func AwaitNextChange() {
 	}
 }
 
-func StartWatching() {
+func StartWatcher() {
+	if IsWatcherActive {
+		logs.Warn("Tried to start watcher twice")
+		return
+	}
+	mutex.Lock()
+	LastError = nil
+	IsWatcherActive = true
+	ch := make(chan error)
+	go watch(ch)
+	LastError = <-ch
+	IsWatcherActive = false
+	logs.Info("Watcher closed")
+	mutex.Unlock()
+}
+
+func watch(ch chan<- error) {
 	w := watcher.New()
-	// w.SetMaxEvents(1)
 	w.FilterOps(watcher.Create, watcher.Rename, watcher.Move, watcher.Write)
-	// r := regexp.MustCompile("^abc$")
-	// w.AddFilterHook(watcher.RegexFilterHook(r, false))
 
 	go func() {
+		notify() // run as first
 		debounced := debounce.New(time.Millisecond * 100)
 		for {
 			select {
 			case <-w.Event:
 				debounced(notify)
 			case err := <-w.Error:
-				logs.Error(err)
+				ch <- fmt.Errorf("Error occured on watcher: %s", err.Error())
+				w.Close()
+				return
 			case <-w.Closed:
+				logs.Info("Watcher has been closed")
 				return
 			}
 		}
 	}()
 
-	// Watch this folder for changes.
 	articlesDir := config.GetArticlesDir()
-	if err := w.AddRecursive(articlesDir); err != nil {
-		log.Fatalln(err)
+	if !utils.IsDir(articlesDir) {
+		ch <- fmt.Errorf("articles dir(%s) is not directory", articlesDir)
+		return
 	}
 
-	// for path, f := range w.WatchedFiles() {
-	// 	fmt.Printf("%s: %s\n", path, f.Name())
-	// }
-
-	if err := w.Start(time.Millisecond * 300); err != nil {
-		log.Fatalln(err)
+	err := w.AddRecursive(articlesDir)
+	if err != nil {
+		ch <- fmt.Errorf("Failed to add recursive watching: %s", err.Error())
+		return
 	}
+
+	err = w.Start(time.Millisecond * 300)
+	if err != nil {
+		ch <- fmt.Errorf("Watcher has been closed with error: %s", err.Error())
+		return
+	}
+	logs.Info("Watcher has closed")
+	ch <- nil
 }

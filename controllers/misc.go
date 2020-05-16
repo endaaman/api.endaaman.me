@@ -10,12 +10,33 @@ type MiscController struct {
 	BaseController
 }
 
-// @Title Get warnings
-// @Description get warnings
-// @Success 200 {string[]} string[]
-// @router /warnings [get]
-func (c *MiscController) GetWarnings() {
-	c.Data["json"] = services.GetWarnings()
+func (c *MiscController) Prepare() {
+	c.BaseController.Prepare()
+	if !c.IsAdmin {
+		c.Respond401()
+		c.StopRun()
+		return
+	}
+}
+
+type statusAnnotation struct {
+	Warnings map[string][]string `json:"warnings"`
+	Watcher  struct {
+		IsActive  bool   `json:"isActive"`
+		LastError string `json:"lastError"`
+	} `json:"watcher"`
+}
+
+// @Title Get status
+// @Description get status
+// @Success 200
+// @router /status [get]
+func (c *MiscController) GetStatus() {
+	status := statusAnnotation{}
+	status.Warnings = services.GetWarnings()
+	status.Watcher.IsActive = services.IsWatcherActive()
+	status.Watcher.LastError = services.GetWathcerLastError()
+	c.Data["json"] = status
 	c.ServeJSON()
 }
 
@@ -38,4 +59,17 @@ func (c *MiscController) GenHash() {
 	}
 	c.Data["json"] = map[string]string{"hash": hash}
 	c.ServeJSON()
+}
+
+// @Title Restart watcher
+// @Success 201 Success
+// @Failure 400 Watcher already started
+// @router /watcher/restart [post]
+func (c *MiscController) RestartWatching() {
+	err := services.RestartWatcher()
+	if err != nil {
+		c.Respond400e(err)
+		return
+	}
+	c.RespondSimple("Queued watcher restart")
 }

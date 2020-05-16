@@ -7,7 +7,6 @@ import (
 	"github.com/endaaman/api.endaaman.me/config"
 	"github.com/endaaman/api.endaaman.me/infras"
 	_ "github.com/endaaman/api.endaaman.me/routers"
-	"github.com/endaaman/api.endaaman.me/services"
 )
 
 //go:generate sh -c "echo 'package routers; import \"github.com/astaxie/beego\"; func init() {beego.BConfig.RunMode = beego.DEV}' > routers/0.go"
@@ -17,9 +16,8 @@ import (
 
 func main() {
 	logs.Info("Starting Mode: `%s`", beego.BConfig.RunMode)
-	infras.PrepareDirs()
-	services.ReadAllArticles()
-	go infras.StartWatching()
+	infras.CheckDirs()
+	go infras.StartWatcher()
 	if config.IsDev() {
 		beego.BConfig.WebConfig.DirectoryIndex = true
 		beego.BConfig.WebConfig.StaticDir["/swagger"] = "swagger"
