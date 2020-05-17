@@ -40,12 +40,6 @@ func IsWatcherActive() bool {
 }
 
 func StartWatcher() {
-	// if IsWatcherActive() {
-	// 	logs.Warn("Tried to start watcher twice")
-	// 	return
-	// }
-
-	logs.Info("Starting starting watcher")
 	watcherMutex.Lock()
 	logs.Info("Starting watcher")
 
@@ -78,9 +72,9 @@ func StartWatcher() {
 				case err := <-watcherInstance.Error:
 					closeNotify <- fmt.Errorf("Error occured on watcher: %s", err.Error())
 					return
-				case <-watcherInstance.Closed:
-					closeNotify <- nil
-					return
+					// case <-watcherInstance.Closed:
+					// 	closeNotify <- nil
+					// 	return
 				}
 			}
 		}()
@@ -98,12 +92,10 @@ func StartWatcher() {
 	} else {
 		logs.Warn("Watcher closed without any error")
 	}
-	logs.Info("Start closing")
 	watcherInstance.Close()
-	logs.Info("Done closing")
 	watcherInstance = nil
 
-	logs.Warn("Unlocked")
+	logs.Info("Watcher has successfull closed")
 	watcherMutex.Unlock()
 }
 
@@ -112,5 +104,5 @@ func RestartWatcher() {
 		logs.Info("Tried to close watcher")
 		closeNotify <- fmt.Errorf("Close watcher manually")
 	}
-	go StartWatcher()
+	StartWatcher()
 }
