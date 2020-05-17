@@ -15,18 +15,21 @@ import (
 var LastError error = nil
 var watcherInstance *watcher.Watcher = nil
 var watcherMutex = &sync.Mutex{}
-var changeNotify = make(chan bool)
-var closeNotify = make(chan error)
+var changeNotify chan bool
+var closeNotify chan error
 
 func notify() {
 	logs.Info("Detect changes")
 	ReadAllArticles()
 	WaitIO()
-	changeNotify <- true
+	if changeNotify != nil {
+		changeNotify <- true
+	}
 }
 
 func AwaitNextChange() {
 	logs.Info("Start awaiting next change and loading done")
+	changeNotify = make(chan bool)
 	select {
 	case <-changeNotify:
 		logs.Info("Load done by event triggered")
