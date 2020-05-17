@@ -11,9 +11,10 @@ type lockable struct {
 	value interface{}
 }
 
-func newLockcable() *lockable {
+func newLockcable(value interface{}) *lockable {
 	l := lockable{}
 	l.mutex = new(sync.RWMutex)
+	l.value = value
 	return &l
 }
 
@@ -30,9 +31,9 @@ func (l *lockable) set(v interface{}) {
 	l.mutex.Unlock()
 }
 
-var aa = newLockcable()
-var cc = newLockcable()
-var ww = newLockcable()
+var aa = newLockcable(make([]*models.Article, 0))
+var cc = newLockcable(make([]*models.Category, 0))
+var ww = newLockcable(make(map[string][]string))
 
 func GetCachedArticles() []*models.Article {
 	v, ok := aa.get().([]*models.Article)

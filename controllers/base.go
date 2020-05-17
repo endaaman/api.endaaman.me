@@ -97,9 +97,7 @@ func (c *BaseController) ExpectJSON(data interface{}) bool {
 
 func (c *BaseController) authorizeToken(token string) {
 	c.IsAdmin = services.ValidateToken(token)
-	if c.IsAdmin {
-		logs.Info("Successfuly logged in.")
-	} else {
+	if !c.IsAdmin {
 		logs.Warn("Tried to authenticate invalid token.")
 	}
 }

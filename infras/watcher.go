@@ -13,81 +13,104 @@ import (
 )
 
 var LastError error = nil
-var IsWatcherActive bool = false
-var mutex sync.Mutex
-var ch = make(chan bool)
+var watcherInstance *watcher.Watcher = nil
+var watcherMutex = &sync.Mutex{}
+var changeNotify = make(chan bool)
+var closeNotify = make(chan error)
 
 func notify() {
 	logs.Info("Detect changes")
 	ReadAllArticles()
 	WaitIO()
-	ch <- true
+	changeNotify <- true
 }
 
 func AwaitNextChange() {
 	logs.Info("Start awaiting next change and loading done")
 	select {
-	case <-ch:
+	case <-changeNotify:
 		logs.Info("Load done by event triggered")
 	case <-time.After(3 * time.Second):
+		logs.Warn("Timeout notify")
 	}
+}
+
+func IsWatcherActive() bool {
+	return watcherInstance != nil
 }
 
 func StartWatcher() {
-	if IsWatcherActive {
-		logs.Warn("Tried to start watcher twice")
-		return
-	}
-	mutex.Lock()
-	LastError = nil
-	IsWatcherActive = true
-	ch := make(chan error)
-	go watch(ch)
-	LastError = <-ch
-	IsWatcherActive = false
-	logs.Info("Watcher closed")
-	mutex.Unlock()
-}
+	// if IsWatcherActive() {
+	// 	logs.Warn("Tried to start watcher twice")
+	// 	return
+	// }
 
-func watch(ch chan<- error) {
-	w := watcher.New()
-	w.FilterOps(watcher.Create, watcher.Rename, watcher.Move, watcher.Write)
+	logs.Info("Starting starting watcher")
+	watcherMutex.Lock()
+	logs.Info("Starting watcher")
+
+	LastError = nil
+	closeNotify = make(chan error)
+	watcherInstance = watcher.New()
+	watcherInstance.FilterOps(watcher.Create, watcher.Rename, watcher.Move, watcher.Write)
 
 	go func() {
-		notify() // run as first
-		debounced := debounce.New(time.Millisecond * 100)
-		for {
-			select {
-			case <-w.Event:
-				debounced(notify)
-			case err := <-w.Error:
-				ch <- fmt.Errorf("Error occured on watcher: %s", err.Error())
-				w.Close()
-				return
-			case <-w.Closed:
-				logs.Info("Watcher has been closed")
-				return
-			}
+		articlesDir := config.GetArticlesDir()
+		if !utils.IsDir(articlesDir) {
+			closeNotify <- fmt.Errorf("articles dir(%s) is not directory", articlesDir)
+			return
 		}
+
+		err := watcherInstance.AddRecursive(articlesDir)
+		if err != nil {
+			closeNotify <- fmt.Errorf("Failed to add recursive watching: %s", err.Error())
+			return
+		}
+
+		go func() {
+			logs.Info("Watcher event loop started")
+			notify() // run at first
+			debounced := debounce.New(time.Millisecond * 100)
+			for {
+				select {
+				case <-watcherInstance.Event:
+					debounced(notify)
+				case err := <-watcherInstance.Error:
+					closeNotify <- fmt.Errorf("Error occured on watcher: %s", err.Error())
+					return
+				case <-watcherInstance.Closed:
+					closeNotify <- nil
+					return
+				}
+			}
+		}()
+
+		err = watcherInstance.Start(time.Millisecond * 300)
+		if err != nil {
+			closeNotify <- fmt.Errorf("Watcher has been closed with error: %s", err.Error())
+			return
+		}
+		closeNotify <- nil
 	}()
-
-	articlesDir := config.GetArticlesDir()
-	if !utils.IsDir(articlesDir) {
-		ch <- fmt.Errorf("articles dir(%s) is not directory", articlesDir)
-		return
+	LastError = <-closeNotify
+	if LastError != nil {
+		logs.Error("Watcher closed because: %s", LastError.Error())
+	} else {
+		logs.Warn("Watcher closed without any error")
 	}
+	logs.Info("Start closing")
+	watcherInstance.Close()
+	logs.Info("Done closing")
+	watcherInstance = nil
 
-	err := w.AddRecursive(articlesDir)
-	if err != nil {
-		ch <- fmt.Errorf("Failed to add recursive watching: %s", err.Error())
-		return
-	}
+	logs.Warn("Unlocked")
+	watcherMutex.Unlock()
+}
 
-	err = w.Start(time.Millisecond * 300)
-	if err != nil {
-		ch <- fmt.Errorf("Watcher has been closed with error: %s", err.Error())
-		return
+func RestartWatcher() {
+	if IsWatcherActive() {
+		logs.Info("Tried to close watcher")
+		closeNotify <- fmt.Errorf("Close watcher manually")
 	}
-	logs.Info("Watcher has closed")
-	ch <- nil
+	go StartWatcher()
 }

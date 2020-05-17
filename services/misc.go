@@ -1,8 +1,6 @@
 package services
 
 import (
-	"fmt"
-
 	"github.com/endaaman/api.endaaman.me/infras"
 )
 
@@ -11,7 +9,7 @@ func GetWarnings() map[string][]string {
 }
 
 func IsWatcherActive() bool {
-	return infras.IsWatcherActive
+	return infras.IsWatcherActive()
 }
 
 func GetWathcerLastError() string {
@@ -22,9 +20,6 @@ func GetWathcerLastError() string {
 }
 
 func RestartWatcher() error {
-	if infras.IsWatcherActive {
-		return fmt.Errorf("Watcher already started.")
-	}
-	go infras.StartWatcher()
+	go infras.RestartWatcher()
 	return nil
 }
