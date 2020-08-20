@@ -46,6 +46,7 @@ func (c *BaseController) Respond404() {
 }
 
 func (c *BaseController) Respond400(message string) {
+	logs.Warn("[400] - %s", message)
 	c.Data["json"] = NewSimpleResponse(message)
 	c.Ctx.ResponseWriter.WriteHeader(400)
 	c.ServeJSON()

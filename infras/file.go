@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/astaxie/beego/logs"
 	"github.com/endaaman/api.endaaman.me/config"
 	"github.com/endaaman/api.endaaman.me/models"
 	"github.com/endaaman/api.endaaman.me/utils"
@@ -23,7 +24,7 @@ func prepareRelative(rel string) (sharedDir string, target string, err error) {
 		err = fmt.Errorf("Shared dir(%s) does not exist.", sharedDir)
 		return
 	}
-	if !utils.IsUnder(sharedDir, target) {
+	if !utils.IsUnder(target, sharedDir) {
 		err = fmt.Errorf("Tried to access under shared dir.")
 		return
 	}
@@ -206,8 +207,12 @@ func RenameFile(src, dest string) error {
 			return
 		}
 
+		// ok: shared/ shared/
+		// ok: shared/ shared/hoge
+		// ng: shared/ hoge/
 		if !utils.IsUnder(destBase, sharedDir) {
 			ch <- fmt.Errorf("Tried to access under shared dir.")
+			logs.Warn("Tried to move a file to `%s` under `%s`", destBase, sharedDir)
 			return
 		}
 

@@ -26,6 +26,6 @@ func EnsureDir(dir string) error {
 	return os.MkdirAll(dir, 0777)
 }
 
-func IsUnder(base, target string) bool {
+func IsUnder(target, base string) bool {
 	return strings.HasPrefix(filepath.Clean(target), filepath.Clean(base))
 }
