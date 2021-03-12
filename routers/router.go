@@ -1,14 +1,7 @@
-// @APIVersion 1.0.0
-// @Title API for endaaman.me
-// @Description api.endaaman.me
-// @Contact buhibuhidog@gmail.com
-// @TermsOfServiceUrl http://beego.me/
-// @License Apache 2.0
-// @LicenseUrl http://www.apache.org/licenses/LICENSE-2.0.html
 package routers
 
 import (
-	"github.com/astaxie/beego"
+	beego "github.com/beego/beego/v2/server/web"
 	"github.com/endaaman/api.endaaman.me/controllers"
 )
 

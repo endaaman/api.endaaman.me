@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/logs"
-	"github.com/astaxie/beego/plugins/cors"
+	"github.com/beego/beego/v2/core/logs"
+	beego "github.com/beego/beego/v2/server/web"
+	"github.com/beego/beego/v2/server/web/filter/cors"
 	"github.com/endaaman/api.endaaman.me/config"
 	"github.com/endaaman/api.endaaman.me/infras"
 	_ "github.com/endaaman/api.endaaman.me/routers"
@@ -29,7 +29,7 @@ func main() {
 		AllowHeaders:     []string{"Origin", "Authorization", "Access-Control-Allow-Origin", "Access-Control-Allow-Headers", "Content-Type"},
 		ExposeHeaders:    []string{"Content-Length", "Access-Control-Allow-Origin", "Access-Control-Allow-Headers", "Content-Type"},
 		AllowCredentials: true,
-	}), true)
+	}))
 
 	beego.Run()
 }

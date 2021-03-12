@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/astaxie/beego/logs"
+	"github.com/beego/beego/v2/core/logs"
 	"github.com/endaaman/api.endaaman.me/config"
 	"github.com/endaaman/api.endaaman.me/utils"
 	"github.com/o1egl/paseto"

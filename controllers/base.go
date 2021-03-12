@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/astaxie/beego"
-	"github.com/astaxie/beego/logs"
+	"github.com/beego/beego/v2/core/logs"
+	beego "github.com/beego/beego/v2/server/web"
 	"github.com/endaaman/api.endaaman.me/models"
 	"github.com/endaaman/api.endaaman.me/services"
 )

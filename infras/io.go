@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/astaxie/beego/logs"
+	"github.com/beego/beego/v2/core/logs"
 	"github.com/endaaman/api.endaaman.me/config"
 	"github.com/endaaman/api.endaaman.me/models"
 	"github.com/endaaman/api.endaaman.me/utils"

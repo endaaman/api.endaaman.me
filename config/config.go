@@ -4,11 +4,15 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/astaxie/beego"
+	"github.com/beego/beego/v2/core/config"
+	beego "github.com/beego/beego/v2/server/web"
 )
 
 func getStringValue(key string) string {
-	s := beego.AppConfig.String(key)
+	s, err := config.String(key)
+	if err != nil {
+		panic(err)
+	}
 	if s == "" {
 		panic(fmt.Errorf("Value of key `%s` is empty", key))
 	}
